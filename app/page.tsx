@@ -1,10 +1,17 @@
 import { Button } from "@/components/ui/button";
+import Logout from "@/module/auth/components/logout";
+import { requireAuth } from "@/module/auth/utils/auth-utils";
+
 import Image from "next/image";
 
-export default function Home() {
+export default async function Home() {
+  await requireAuth();
   return (
-    <div>
-      <Button className="primary">Click Me</Button>
-    </div>
+    
+    
+      <Logout className="min-h-screen flex items-center justify-center">
+      <Button >Logout</Button>
+      </Logout>
+    
   );
 }
