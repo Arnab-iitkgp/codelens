@@ -19,22 +19,22 @@ const LoginUI = () => {
   };
 
   return (
-    <main className="h-screen w-screen bg-zinc-950 text-zinc-100">
-      <div className="grid h-full grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
+    <main className="min-h-screen w-full bg-zinc-950 text-zinc-100">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
 
-        {/* LEFT — PRODUCT STORY */}
-        <section className="relative flex flex-col justify-center px-10 lg:px-20">
+        {/* LEFT — PRODUCT STORY (DESKTOP ONLY) */}
+        <section className="relative hidden lg:flex flex-col justify-center px-16">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#27272a_1px,transparent_0)] [background-size:28px_28px] opacity-25" />
 
           <div className="relative z-10 max-w-2xl">
-            <h1 className="text-5xl font-semibold leading-tight tracking-tight">
+            <h1 className="text-4xl xl:text-5xl font-semibold leading-tight tracking-tight">
               Code reviews that
               <span className="text-zinc-400"> don’t miss the obvious.</span>
             </h1>
 
             <p className="mt-6 text-lg text-zinc-400 max-w-xl">
               CodeLens analyzes pull requests line-by-line to surface bugs,
-              performance issues, and architectural smells-instantly.
+              performance issues, and architectural smells—instantly.
             </p>
 
             <ul className="mt-10 space-y-4 text-sm">
@@ -58,8 +58,8 @@ const LoginUI = () => {
         </section>
 
         {/* RIGHT — AUTH PANEL */}
-        <section className="flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
+        <section className="flex items-center justify-center px-4 sm:px-6">
+          <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8 shadow-2xl">
             <h2 className="text-lg font-medium">
               Get started with CodeLens
             </h2>
@@ -70,7 +70,7 @@ const LoginUI = () => {
             <button
               onClick={handleGithubLogin}
               disabled={isLoading}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-md border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-medium hover:bg-zinc-700 transition disabled:opacity-60"
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-md border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-medium transition hover:bg-zinc-700 disabled:opacity-60"
             >
               {isLoading ? (
                 <span className="animate-pulse">Signing in…</span>
@@ -82,7 +82,7 @@ const LoginUI = () => {
               )}
             </button>
 
-            <p className="mt-4 text-xs text-zinc-500">
+            <p className="mt-4 text-center text-xs text-zinc-500">
               Read-only access. No credentials stored. Revoke anytime.
             </p>
           </div>
