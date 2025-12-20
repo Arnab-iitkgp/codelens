@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession, signOut } from "@/lib/auth-client"
-import { Home, Settings, LogOut } from "lucide-react"
+import { Home, Settings, LogOut,Sun,Moon } from "lucide-react"
 
 import {
   Sidebar,
@@ -20,7 +20,7 @@ export const AppSidebar = () => {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mounted, setMounted] = useState(false)
-
+  const [theme, setTheme] = useState<"light" | "dark">("light")
   useEffect(() => setMounted(true), [])
   if (!mounted || !session) return null
 
@@ -84,6 +84,19 @@ export const AppSidebar = () => {
       {/* Footer */}
       <SidebarFooter className="border-t p-2">
         <SidebarMenu>
+          <SidebarMenuItem>
+  <SidebarMenuButton
+    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+  >
+    {theme === "dark" ? (
+      <Sun className="h-4 w-4" />
+    ) : (
+      <Moon className="h-4 w-4" />
+    )}
+    <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
+  </SidebarMenuButton>
+</SidebarMenuItem>
+
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => signOut()}>
               {/* Avatar */}

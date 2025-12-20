@@ -6,24 +6,25 @@ import {
 from "@/module/github/lib/github"
 import { headers } from "next/headers"
 import { Octokit } from "octokit"
-import { any, object } from "zod"
+import { date } from "zod"
 
 export async function getDashboardStats(){
     try {
         const session = await auth.api.getSession({
-            headers:await headers()
+            headers: await headers()
         })
-
+        
         if(!session?.user){
             throw new Error("Unauthorized")
         }
         const token = await getAccessToken()
+        console.log(token);
         const octokit = new Octokit({auth:token})
 
         // get users username of github
         const {data:user} = await octokit.rest.users.getAuthenticated()
         const totalRepos =30; //TODO: fetch total connected repos from db
-    
+        console.log(totalRepos);
         const calendar = await fetchUserContributions(token,user.login as string)
         const totalCommits = calendar?.totalContributions || 0
         
@@ -39,8 +40,8 @@ export async function getDashboardStats(){
 
         return{
             totalCommits,
-            totalPRs
-            ,totalRepos,
+            totalPRs,
+            totalRepos,
             totalReviews
         };
     } catch (error) {
@@ -69,7 +70,7 @@ export async function getMonthlyActivity(){
         // get users username of github
         const {data:user} = await octokit.rest.users.getAuthenticated()
 
-        const calendar = await fetchUserContributions(token,user.login as string)
+        const calendar = await fetchUserContributions(token,user.login)
         if(!calendar){
            return []; 
         }
@@ -151,3 +152,35 @@ export async function getMonthlyActivity(){
     
 }
 
+export async function getConrtibutionStats(){
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers()
+        })
+        if(!session?.user){
+            throw new Error("Unauthorized")
+        }
+        const token = await getAccessToken()    
+        const octokit = new Octokit({auth:token})
+
+        const {data:user} = await octokit.rest.users.getAuthenticated()
+        const calendar = await fetchUserContributions(token,user.login)
+        if(!calendar){
+            return null
+        }
+        const contributions = calendar.weeks.flatMap((week)=> week.contributionDays.map((day)=>({
+            date:day.date,
+            count:day.contributionCount,
+            level:Math.min(4,Math.floor(day.contributionCount/3)) // scaling o to 4
+        }))
+        )
+        return {
+            contributions,
+            totalContributions:calendar.totalContributions
+        }
+    } catch (error) {
+        console.error("Error fetching contribution stats:",error);
+        return null
+    }
+
+}

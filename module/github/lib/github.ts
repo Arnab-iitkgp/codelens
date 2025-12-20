@@ -3,6 +3,7 @@ import prisma from "@/lib/db"
 import { headers } from "next/headers"
 import {Octokit} from "octokit"
 
+
 export const getAccessToken  = async ()=>{
 
     const session = await auth.api.getSession({
@@ -26,7 +27,7 @@ export const getAccessToken  = async ()=>{
     return account.accessToken
 }
 
-export const fetchUserContributions = async (token:string | null, username:string)=>{
+export const fetchUserContributions = async (token:string | null, userName:string)=>{
     const octokit = new Octokit({
         auth:token})
     const query = `query($userName:String!){
@@ -63,10 +64,10 @@ export const fetchUserContributions = async (token:string | null, username:strin
     }
         try{
       const response:contributionData = await octokit.graphql(query,{
-        username
+        userName
       })
         return response.user.contributionsCollection.contributionCalendar   
     }catch(error){
-        throw new Error("Failed to fetch contributions")
+        throw new Error("Failed to fetch contributions,error:"+error)
     }
 }
