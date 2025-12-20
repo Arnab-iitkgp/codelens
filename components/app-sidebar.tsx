@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession, signOut } from "@/lib/auth-client"
+import { useTheme } from "next-themes"
 import { Home, Settings, LogOut,Sun,Moon } from "lucide-react"
 
 import {
@@ -19,10 +20,13 @@ import {
 export const AppSidebar = () => {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
   useEffect(() => setMounted(true), [])
   if (!mounted || !session) return null
+  
+  // Use resolvedTheme to handle "system" theme properly
+  const currentTheme = resolvedTheme || theme || "light"
 
   const user = session.user
   const userName = user.name || "User"
@@ -85,17 +89,17 @@ export const AppSidebar = () => {
       <SidebarFooter className="border-t p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-  <SidebarMenuButton
-    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-  >
-    {theme === "dark" ? (
-      <Sun className="h-4 w-4" />
-    ) : (
-      <Moon className="h-4 w-4" />
-    )}
-    <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-  </SidebarMenuButton>
-</SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
+            >
+              {currentTheme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+              <span>{currentTheme === "dark" ? "Light mode" : "Dark mode"}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
 
           <SidebarMenuItem>
             <SidebarMenuButton onClick={() => signOut()}>
