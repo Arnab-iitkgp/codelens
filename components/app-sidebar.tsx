@@ -40,7 +40,7 @@ export const AppSidebar = () => {
 
   const navigationItems = [
     { title: "Dashboard", url: "/dashboard", icon: Home },
-    { title: "Repository", url: "/dashboard/repo", icon: Home },
+    { title: "Repository", url: "/dashboard/repository", icon: Home },
     { title: "Reviews", url: "/dashboard/reviews", icon: Home },
     { title: "Subscription", url: "/dashboard/subscription", icon: Home },
     { title: "Settings", url: "/dashboard/settings", icon: Settings },

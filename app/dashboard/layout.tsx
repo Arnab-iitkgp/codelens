@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { requireAuth } from "@/module/auth/utils/auth-utils"
+import { Toaster } from "@/components/ui/sonner"
 export default async function DashboardLayout({
   children,
 }: {
@@ -29,6 +30,7 @@ export default async function DashboardLayout({
         {/* Content */}
         <main className="flex-1 p-6">
           {children}
+          <Toaster/>
         </main>
       </SidebarInset>
     </SidebarProvider>
