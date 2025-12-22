@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession, signOut } from "@/lib/auth-client"
 import { useTheme } from "next-themes"
-import { Home, Settings, LogOut,Sun,Moon } from "lucide-react"
+import { Home, Settings, LogOut,Sun,Moon, Github, MessageSquare, Crown } from "lucide-react"
 
 import {
   Sidebar,
@@ -39,10 +39,10 @@ export const AppSidebar = () => {
     .toUpperCase()
 
   const navigationItems = [
-    { title: "Dashboard", url: "/dashboard", icon: Home },
-    { title: "Repository", url: "/dashboard/repository", icon: Home },
-    { title: "Reviews", url: "/dashboard/reviews", icon: Home },
-    { title: "Subscription", url: "/dashboard/subscription", icon: Home },
+    { title: "Home", url: "/dashboard", icon: Home },
+    { title: "Repository", url: "/dashboard/repository", icon: Github },
+    { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare },
+    { title: "Subscription", url: "/dashboard/subscription", icon: Crown },
     { title: "Settings", url: "/dashboard/settings", icon: Settings },
   ]
 
@@ -52,7 +52,7 @@ export const AppSidebar = () => {
   return (
     <Sidebar collapsible="icon" className="border-r bg-background">
       {/* Top Branding */}
-      <SidebarHeader className="h-14 flex items-center px-4 border-b">
+      <SidebarHeader className="h-14 flex px-4 border-b">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-md bg-muted flex items-center justify-center text-sm font-semibold">
             CL
@@ -67,7 +67,7 @@ export const AppSidebar = () => {
       </SidebarHeader>
 
       {/* Navigation */}
-      <SidebarContent className="pt-2">
+      <SidebarContent className="pt-6">
         <SidebarMenu>
           {navigationItems.map((item) => (
             <SidebarMenuItem key={item.url}>
@@ -76,7 +76,7 @@ export const AppSidebar = () => {
                 isActive={isActive(item.url)}
               >
                 <Link href={item.url}>
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-6 w-6 gap" />
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>

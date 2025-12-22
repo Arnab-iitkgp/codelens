@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/db"
 import { headers } from "next/headers"
 import {Octokit} from "octokit"
+import { fa } from "zod/v4/locales"
 
 
 export const getAccessToken  = async ()=>{
@@ -118,4 +119,34 @@ export const createWebhook = async (owner:string,repo:string)=>{
 
           return data;
 
+}
+
+export const deleteWebHook = async (owner:string,repo:string)=>{
+    const token = await getAccessToken();
+    const octokit = new Octokit({auth:token})
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_BASE_URL}/api/webhooks/github`
+    try{
+        const {data:hooks} = await octokit.rest.repos.listWebhooks({
+            owner,
+            repo
+          })
+          const hooksToDelete = hooks.find(hook=>hook.config.url===webhookUrl)
+          if(!hooksToDelete){
+            throw new Error("Webhook not found")
+          }
+          if(hooksToDelete){
+            await octokit.rest.repos.deleteWebhook({
+                owner,  
+                repo,
+                hook_id:hooksToDelete.id
+            })
+          }
+            return true
+    }catch(error){
+
+        console.error
+        ("Failed to delete webhook,error:"+error)
+
+        return false
+    }
 }

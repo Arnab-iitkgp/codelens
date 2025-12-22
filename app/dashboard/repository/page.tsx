@@ -105,6 +105,7 @@ const RepositoryPage = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
+      {isLoading && <RepositoryListSkeleton />}
       <div className="grid gap-4">
         {filterRepositories.map((repo: Repository) => (
           <Card key={repo.id} className="hover:shadow-lg transition-shadow p-4">
@@ -155,7 +156,7 @@ const RepositoryPage = () => {
         {isFetchingNextPage && <RepositoryListSkeleton />}
         {!hasNextPage && allRepositories.length > 0 && (
           <p className="text-center text-sm text-muted-foreground">
-            No Repositories found, You have reached the end of the list
+            No more Repositories found, You have reached the end of the list
           </p>
         )}
       </div>
