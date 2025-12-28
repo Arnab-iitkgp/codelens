@@ -3,15 +3,6 @@ import { inngest } from "../client";
 import { getRepoFileContents } from "@/module/github/lib/github";
 import { indexCodebase } from "@/module/ai/lib/rag";
 
-export const helloWorld = inngest.createFunction(
-  { id: "hello-world" },
-  { event: "test/hello.world" },
-  async ({ event, step }) => {
-    await step.sleep("wait-a-moment", "1s");
-    return { message: `Hello ${event.data.email}!` };
-  },
-);
-
 export const indexRepo  =inngest.createFunction(
   {id:"index-repo"},
   {event:"repository.connected"},

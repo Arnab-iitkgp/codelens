@@ -37,7 +37,7 @@ model Repository{
   url String
   userId String
   user User @relation(fields:[userId], references: [id], onDelete: Cascade)
-
+  reviews Review[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -45,7 +45,21 @@ model Repository{
   @@map("repository")
 }
 
+model Review{
+  id String @id @default(cuid())
+  repositoryId String
+  repository Repository @relation(fields:[repositoryId], references:[id], onDelete: Cascade)
+  prNumber Int
+  prTitle String
+  prurl String
+  review String @db.Text
+  status String @default("completed") // pending, completed, failed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([repositoryId])
+  @@map("review") 
+}
 model Session {
   id        String   @id
   expiresAt DateTime
