@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +18,6 @@ export default function ReviewsPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -57,9 +51,7 @@ export default function ReviewsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Review History</h1>
-        <p className="text-muted-foreground">
-          View all AI code reviews
-        </p>
+        <p className="text-muted-foreground">View all AI code reviews</p>
       </div>
 
       {/* Empty State */}
@@ -75,9 +67,7 @@ export default function ReviewsPage() {
         <div className="grid gap-4">
           {reviews?.map((review) => {
             const preview = review.review
-              ? review.review
-                  .replace(/\n{3,}/g, "\n\n")
-                  .slice(0, 200)
+              ? review.review.replace(/\n{3,}/g, "\n\n").slice(0, 200)
               : "";
 
             return (
@@ -101,16 +91,14 @@ export default function ReviewsPage() {
                         : "bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900"
                     }
                   >
-                    {review.status === "FAILED"
-                      ? "Failed"
-                      : "Completed"}
+                    {review.status === "FAILED" ? "Failed" : "Completed"}
                   </Badge>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
                   {/* Review Preview Box */}
                   <div className="rounded-md border bg-muted/40 p-4">
-                    <pre className="whitespace-pre-wrap break-words text-sm text-muted-foreground leading-relaxed font-sans">
+                    <pre className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed font-sans">
                       {preview || "No review content available."}
                     </pre>
                   </div>

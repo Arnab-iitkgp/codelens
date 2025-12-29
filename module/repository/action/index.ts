@@ -6,6 +6,7 @@ import { headers } from "next/headers"
 import { createWebhook, getRepositories } from "@/module/github/lib/github"
 import { AArrowUpIcon } from "lucide-react"
 import { inngest } from "@/inngest/client"
+import { canConnectRepository, incrementRepositoryCount } from "@/module/payment/lib/subscription"
 
 export async function fetchRepositories ( page:number=1, perPage:number =10){
      const session = await auth.api.getSession ({
@@ -41,6 +42,12 @@ export const connectRepository = async (owner:string,repo:string, githubId:numbe
    }
    //TODO: cchek if user can connect more repo or not (free vs paid)
 
+   const canConnect = await canConnectRepository(session.user.id);
+
+   if(!canConnect){
+      throw new Error("Repository Limit reached. Upgrade to Pro for unlimited repositores connection")
+   }
+
    const webhook = await createWebhook(owner,repo)
    if(webhook){
       await prisma.repository.create({
@@ -53,10 +60,10 @@ export const connectRepository = async (owner:string,repo:string, githubId:numbe
             userId:session.user.id
          }
       })
-   }
+   
 
    //TODO: increment repository count for usage track
-
+      await incrementRepositoryCount(session.user.id)
    // trigger repository indexing for rag.
    try {
       await inngest.send({
@@ -70,6 +77,6 @@ export const connectRepository = async (owner:string,repo:string, githubId:numbe
    } catch (error) {
          console.error("Failed to trigger repository indexing",error)
    }
-
+}
    return webhook;
 }

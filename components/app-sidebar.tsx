@@ -39,7 +39,7 @@ export const AppSidebar = () => {
     .toUpperCase()
 
   const navigationItems = [
-    { title: "Home", url: "/dashboard", icon: Home },
+    { title: "Home", url: "/dashboard/home", icon: Home },
     { title: "Repository", url: "/dashboard/repository", icon: Github },
     { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare },
     { title: "Subscription", url: "/dashboard/subscription", icon: Crown },

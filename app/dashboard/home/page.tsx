@@ -52,20 +52,23 @@ const MainPage = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Repositories
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Repositories</CardTitle>
             <GitBranch className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
+
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading ? "..." : stats?.totalRepos || 0}
+              {isLoading
+                ? "..."
+                : `${stats?.connectedRepos ?? 0} / ${stats?.totalRepos ?? 0}`}
             </div>
+
             <p className="text-sm text-muted-foreground">
-              Number of repositories
+              Connected / Total repositories
             </p>
           </CardContent>
         </Card>
+
         {/* total commits */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -127,7 +130,7 @@ const MainPage = () => {
           <ContributionGraph />
         </CardContent>
       </Card>
-    {/*TODO: fix :not all contributions showing up */}
+      {/*TODO: fix :not all contributions showing up */}
       <div className="grid gap-4 md:grid-col-2">
         <Card className="col-span-2">
           <CardHeader>

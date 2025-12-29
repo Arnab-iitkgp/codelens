@@ -28,6 +28,6 @@ export async function getReviews(){
         },
         take:50
     });
-
+    console.log(reviews.length);
     return reviews;
 }
