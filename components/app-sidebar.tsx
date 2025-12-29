@@ -76,7 +76,7 @@ export const AppSidebar = () => {
                 isActive={isActive(item.url)}
               >
                 <Link href={item.url}>
-                  <item.icon className="h-6 w-6 gap" />
+                  <item.icon className="h-6 w-6" />
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>

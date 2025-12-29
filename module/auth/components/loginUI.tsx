@@ -24,7 +24,7 @@ const LoginUI = () => {
 
         {/* LEFT — PRODUCT STORY (DESKTOP ONLY) */}
         <section className="relative hidden lg:flex flex-col justify-center px-16">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#27272a_1px,transparent_0)] [background-size:28px_28px] opacity-25" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,#27272a_1px,transparent_0)] opacity-25" />
 
           <div className="relative z-10 max-w-2xl">
             <h1 className="text-4xl xl:text-5xl font-semibold leading-tight tracking-tight">
