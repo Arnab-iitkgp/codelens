@@ -89,10 +89,10 @@ const RepositoryPage = () => {
       repo.full_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
   return (
-    <div className=" space-y-4">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Repositories</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Repositories</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Manage all your Github Repositories
         </p>
       </div>
@@ -108,29 +108,34 @@ const RepositoryPage = () => {
       {isLoading && <RepositoryListSkeleton />}
       <div className="grid gap-4">
         {filterRepositories.map((repo: Repository) => (
-          <Card key={repo.id} className="hover:shadow-lg transition-shadow p-4">
-            <CardHeader>
-              <div className=" flex items-start justify-between">
-                <div className=" space-y-2 flex-1">
-                  <div className=" flex items-center gap-2">
-                    <CardTitle className=" text-lg font-semibold">
+          <Card key={repo.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle className="text-base sm:text-lg font-semibold break-words">
                       {repo.name}
                     </CardTitle>
-                    <Badge variant="outline">
-                      {repo.language || "Unknown"}
-                    </Badge>
-                    {repo.isConnected && (
-                      <Badge variant="secondary">Connected</Badge>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {repo.language || "Unknown"}
+                      </Badge>
+                      {repo.isConnected && (
+                        <Badge variant="secondary" className="text-xs">Connected</Badge>
+                      )}
+                    </div>
                   </div>
-                  <CardDescription>{repo.description}</CardDescription>
+                  <CardDescription className="text-sm break-words">
+                    {repo.description || "No description available"}
+                  </CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" asChild>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="ghost" size="icon" asChild className="h-9 w-9">
                     <a
                       href={repo.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      aria-label="Open repository on GitHub"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>
@@ -139,6 +144,7 @@ const RepositoryPage = () => {
                     onClick={() => handleConnect(repo)}
                     disabled={localConnectingId == repo.id || repo.isConnected}
                     variant={repo.isConnected ? "outline" : "default"}
+                    className="h-9 text-sm"
                   >
                     {localConnectingId == repo.id
                       ? "Connecting..."

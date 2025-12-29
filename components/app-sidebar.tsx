@@ -54,9 +54,11 @@ export const AppSidebar = () => {
       {/* Top Branding */}
       <SidebarHeader className="h-14 flex px-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-md bg-muted flex items-center justify-center text-sm font-semibold">
-            CL
-          </div>
+          <img 
+            src="/codelens-logo.png" 
+            alt="CodeLens" 
+            className="h-12 w-13"
+          />
           <div className="leading-tight">
             <p className="text-sm font-semibold">CodeLens</p>
             <p className="text-xs text-muted-foreground">
