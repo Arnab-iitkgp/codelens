@@ -22,12 +22,11 @@ export const indexRepo  =inngest.createFunction(
         }
 
         return await getRepoFileContents(account.accessToken,owner,repo);
-
       })
 
       await step.run("index-codebase",async ()=>{
         // await indexCodebase
-        await indexCodebase(`${owner}-${repo}`,files)
+        await indexCodebase(`${owner}/${repo}`,files)
       })
       return{success:true,indexedFiles:files.length }
   }

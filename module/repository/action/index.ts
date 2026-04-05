@@ -4,7 +4,6 @@ import prisma from "@/lib/db"
 import {auth} from "@/lib/auth"
 import { headers } from "next/headers"
 import { createWebhook, getRepositories } from "@/module/github/lib/github"
-import { AArrowUpIcon } from "lucide-react"
 import { inngest } from "@/inngest/client"
 import { canConnectRepository, incrementRepositoryCount } from "@/module/payment/lib/subscription"
 

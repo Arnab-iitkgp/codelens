@@ -1,6 +1,5 @@
 import { reviewPullRequest } from "@/module/ai/actions";
 import { NextResponse,NextRequest } from "next/server";
-import { act } from "react";
 
 export async function POST (req:NextRequest){
     try {
@@ -11,7 +10,9 @@ export async function POST (req:NextRequest){
             return NextResponse.json({msg:"pong"},{status:200})
         }
 
-        //TODO: handle other events like push, etc.
+        if(event!=="pull_request"){
+            return NextResponse.json({msg:"event ignored"},{status:200})
+        }
 
         if(event==="pull_request"){
             const action = body.action

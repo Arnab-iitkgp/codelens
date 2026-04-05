@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -32,19 +33,22 @@ export default async function Home() {
                 <p className="text-xs text-muted-foreground">AI Reviewer</p>
               </div>
             </div>
-            {isAuthenticated ? (
-              <Link href="/dashboard/home">
-                <Button size="sm">
-                  Go to Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/login">
-                <Button variant="outline" size="sm">
-                  Sign in
-                </Button>
-              </Link>
-            )}
+            <div className="flex items-center gap-4">
+              <ModeToggle />
+              {isAuthenticated ? (
+                <Link href="/dashboard/home">
+                  <Button size="sm">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/login">
+                  <Button variant="outline" size="sm">
+                    Sign in
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -55,7 +59,7 @@ export default async function Home() {
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
               Code reviews{" "}
-              <span className="text-primary">with zero blind spots</span>
+              <span className="text-emerald-600 dark:text-emerald-400">with zero blind spots</span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
               CodeLens analyzes pull requests line-by-line to surface bugs,

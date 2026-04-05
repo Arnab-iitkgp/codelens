@@ -3,7 +3,6 @@
 import { inngest } from "@/inngest/client"
 import prisma from "@/lib/db"
 import { getPullRequestDiff } from "@/module/github/lib/github"
-import { success } from "zod"
 import { canCreateReview, incrementReviewCount } from "@/module/payment/lib/subscription"
 
 export async function reviewPullRequest(owner:string,repo:string,prNumber:number){

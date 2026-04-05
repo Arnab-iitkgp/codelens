@@ -41,7 +41,7 @@ export const generateReview=inngest.createFunction(
 
     //retrieve context
     const context = await step.run("retrieve-context", async () => {
-      const query = `${title}\n${description}}`;
+      const query = `${title}\n${description}`;
       return await retrieveContext(query, `${owner}/${repo}`);
     });
     //generate review

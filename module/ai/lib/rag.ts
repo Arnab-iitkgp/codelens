@@ -1,8 +1,6 @@
 import { pinecone, pineconeIndex } from "@/lib/pinecone-db";
 import { embed } from "ai";
 import { google } from "@ai-sdk/google";
-import { meta } from "zod/v4/core";
-import { metadata } from "@/app/layout";
 
 export async function generateEmbedding(text: string) {
   const { embedding } = await embed({
