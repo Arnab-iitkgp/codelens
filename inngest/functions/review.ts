@@ -4,7 +4,7 @@ import {
   getPullRequestDiff,
   postReviewComment,
 } from "@/module/github/lib/github";
-import { google } from "@ai-sdk/google";
+import { getLanguageModel } from "@/module/ai/lib/models";
 import { generateText } from "ai";
 import { retrieveContext } from "@/module/ai/lib/rag";
 
@@ -70,7 +70,7 @@ Please provide:
 Format your response in markdown.`;
 
       const { text } = await generateText({
-        model: google("gemini-2.5-flash"),
+        model: getLanguageModel(),
         prompt,
       });
       return text;

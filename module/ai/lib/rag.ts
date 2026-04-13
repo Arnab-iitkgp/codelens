@@ -1,10 +1,34 @@
 import { pinecone, pineconeIndex } from "@/lib/pinecone-db";
 import { embed } from "ai";
-import { google } from "@ai-sdk/google";
+import { getEmbeddingModel } from "@/module/ai/lib/models";
+import { InferenceClient } from "@huggingface/inference";
 
-export async function generateEmbedding(text: string) {
+const DEFAULT_HF_EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2";
+
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const provider = process.env.AI_EMBEDDING_PROVIDER || "google";
+
+  if (provider === "huggingface") {
+    const hf = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
+    const modelId =
+      process.env.AI_EMBEDDING_MODEL_ID || DEFAULT_HF_EMBEDDING_MODEL;
+
+    const result = await hf.featureExtraction({
+      model: modelId,
+      inputs: text,
+    });
+
+    // HF can return nested arrays (number[][]) depending on the model —
+    // flatten if needed (matches proven working pattern)
+    if (Array.isArray(result) && Array.isArray(result[0])) {
+      return result[0] as number[];
+    }
+    return result as number[];
+  }
+
+  // Default path: use Vercel AI SDK (google / openai)
   const { embedding } = await embed({
-    model: google.textEmbeddingModel("text-embedding-004"),
+    model: getEmbeddingModel(),
     value: text,
   });
   return embedding;
