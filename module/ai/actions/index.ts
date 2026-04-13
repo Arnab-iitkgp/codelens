@@ -1,4 +1,4 @@
-"use server"
+
 
 import { inngest } from "@/inngest/client"
 import prisma from "@/lib/db"
