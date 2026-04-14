@@ -4,7 +4,8 @@ import {
   CheckCircle2, 
   Github, 
   Code2,
-  ArrowRight
+  ArrowRight,
+  Play
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -82,10 +83,10 @@ export default async function Home() {
                     <Github className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/login">
-                  <Button size="lg" variant="outline">
-                    Learn more
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                <Link href="/demo">
+                  <Button size="lg" variant="outline" className="group">
+                    Try Live Demo
+                    <Play className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
               </div>

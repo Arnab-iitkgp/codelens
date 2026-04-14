@@ -30,7 +30,6 @@ export default async function DashboardLayout({
         {/* Content */}
         <main className="flex-1 p-6">
           {children}
-          <Toaster/>
         </main>
       </SidebarInset>
     </SidebarProvider>
