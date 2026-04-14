@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { getReviews } from "@/module/review/action";
 import Link from "next/link";
+import { Streamdown } from "streamdown";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function ReviewsPage() {
   const { data: reviews, isLoading } = useQuery({
@@ -96,25 +98,62 @@ export default function ReviewsPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Review Preview Box */}
-                  <div className="rounded-md border bg-muted/40 p-4">
-                    <pre className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed font-sans">
-                      {preview || "No review content available."}
-                    </pre>
-                  </div>
+                  <Dialog>
+                    {/* Review Preview Box (Height-limited with gradient fade) */}
+                    <div className="relative rounded-md border bg-muted/10 p-6 overflow-hidden max-h-64">
+                      <div className="prose prose-sm dark:prose-invert max-w-none 
+                        prose-headings:border-b prose-headings:pb-2 prose-headings:font-semibold
+                        prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                        prose-a:text-primary hover:prose-a:underline
+                        prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                        prose-pre:bg-muted/50 prose-pre:border prose-pre:text-[13px]
+                      ">
+                        <Streamdown>{review.review || "No review content available."}</Streamdown>
+                      </div>
+                      
+                      {/* Gradient overlay to fade text out at the bottom */}
+                      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+                    </div>
 
-                  {/* Action */}
-                  {review.prurl && (
-                    <Button asChild variant="outline" size="sm">
-                      <Link
-                        href={review.prurl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View Full Review on GitHub
-                      </Link>
-                    </Button>
-                  )}
+                    {/* Actions */}
+                    <div className="flex items-center gap-3">
+                      <DialogTrigger asChild>
+                        <Button variant="secondary" size="sm">
+                          View full review
+                        </Button>
+                      </DialogTrigger>
+
+                      {review.prurl && (
+                        <Button asChild variant="outline" size="sm">
+                          <Link
+                            href={review.prurl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on GitHub
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Full Review Modal */}
+                    <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>{review.prTitle}</DialogTitle>
+                      </DialogHeader>
+                      <div className="flex-1 overflow-y-auto p-4 rounded-md border bg-muted/10">
+                        <div className="prose prose-sm dark:prose-invert max-w-none 
+                          prose-headings:border-b prose-headings:pb-2 prose-headings:font-semibold
+                          prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                          prose-a:text-primary hover:prose-a:underline
+                          prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                          prose-pre:bg-muted/50 prose-pre:border prose-pre:text-[13px]
+                        ">
+                          <Streamdown>{review.review || "No review content available."}</Streamdown>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             );
