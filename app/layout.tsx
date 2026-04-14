@@ -20,8 +20,38 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "CodeLens",
-  description: "AI Reviewer for your code",
+  title: {
+    default: "CodeLens — AI Code Reviews with Zero Blind Spots",
+    template: "%s | CodeLens",
+  },
+  description:
+    "CodeLens analyzes pull requests line-by-line to surface bugs, performance issues, and architectural smells in real time. AI-powered code reviews for GitHub.",
+  keywords: [
+    "AI code review",
+    "code review tool",
+    "GitHub code review",
+    "automated code review",
+    "pull request review",
+    "code analysis",
+    "CodeLens",
+  ],
+  openGraph: {
+    title: "CodeLens — AI Code Reviews with Zero Blind Spots",
+    description:
+      "Analyzes pull requests line-by-line to surface bugs, performance issues, and code smells in real time.",
+    type: "website",
+    siteName: "CodeLens",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CodeLens — AI Code Reviews with Zero Blind Spots",
+    description:
+      "Analyzes pull requests line-by-line to surface bugs, performance issues, and code smells in real time.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

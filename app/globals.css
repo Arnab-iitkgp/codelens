@@ -186,3 +186,22 @@ body {
     @apply cursor-pointer;
   }
 }
+
+/* Landing page: animated dot grid background */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1.2px, transparent 1.2px);
+  background-size: 16px 16px;
+  animation: dot-drift 60s ease-in-out infinite;
+}
+
+@keyframes dot-drift {
+  0% { background-position: 0 0; }
+  50% { background-position: 12px 8px; }
+  100% { background-position: 0 0; }
+}
+
+/* Landing page: subtle emerald glow behind hero heading */
+.glow-emerald {
+  background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
