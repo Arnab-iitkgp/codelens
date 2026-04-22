@@ -52,21 +52,20 @@ export async function POST(req: NextRequest) {
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
 
-    // Rate limit check: 1 attempt per IP per 24 hours
+    // Rate limit check: 2 attempts per IP per 24 hours
     const cutoff = new Date(Date.now() - RATE_LIMIT_HOURS * 60 * 60 * 1000);
-    const recentAttempt = await prisma.demoAttempt.findFirst({
+    const recentAttempts = await prisma.demoAttempt.count({
       where: {
         ipAddress: ip,
         createdAt: { gte: cutoff },
       },
-      orderBy: { createdAt: "desc" },
     });
 
-    if (recentAttempt) {
+    if (recentAttempts >= 2) {
       return NextResponse.json(
         {
           error: "Rate limit exceeded",
-          message: "You can try the demo once every 24 hours.",
+          message: "You can try the demo twice every 24 hours.",
         },
         { status: 429 }
       );

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { FileCode, Play, AlertCircle, RefreshCw, Github, GitPullRequest, TerminalSquare, Loader2, ChevronDown, PanelLeft, X } from "lucide-react";
+import { FileCode, Play, AlertCircle, RefreshCw, Github, GitPullRequest, TerminalSquare, Loader2, ChevronDown, PanelLeft, X, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -47,6 +47,7 @@ export default function DemoPage() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isRepoCollapsed, setIsRepoCollapsed] = useState(false);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Fetch files from GitHub on mount
   useEffect(() => {
@@ -197,6 +198,18 @@ export default function DemoPage() {
     setElapsedSeconds(0);
   };
 
+  const handleCopyReview = async () => {
+    if (!reviewResult) return;
+    try {
+      await navigator.clipboard.writeText(reviewResult);
+      setIsCopied(true);
+      toast.success("Review copied to clipboard!");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      toast.error("Failed to copy review.");
+    }
+  };
+
   const closeFile = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const newOpenFiles = openFiles.filter((f) => f !== path);
@@ -249,6 +262,10 @@ export default function DemoPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border/50 bg-muted/30 px-2 py-1.5 rounded pr-3">
+            <AlertCircle className="h-3.5 w-3.5 text-primary/70" />
+            <span><strong className="text-foreground/80">2 demos</strong> limit per day</span>
+          </div>
           <Link href="/login">
             <Button size="sm" variant="default" className="h-8">
               Sign In
@@ -608,6 +625,10 @@ export default function DemoPage() {
                     </Button>
                   </Link>
                 )}
+                <Button variant="outline" size="sm" className="h-8" onClick={handleCopyReview} disabled={!reviewResult}>
+                  {isCopied ? <Check className="mr-2 h-4 w-4 text-emerald-500" /> : <Copy className="mr-2 h-4 w-4" />}
+                  {isCopied ? "Copied" : "Copy Review"}
+                </Button>
                 <Link href="/login">
                   <Button size="sm" className="h-8 shadow-sm">
                     Connect GitHub to Automate

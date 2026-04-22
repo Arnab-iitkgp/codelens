@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { 
   Github, 
   ArrowRight,
+  Star,
 } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -28,7 +29,11 @@ export default async function Home() {
               />
               <span className="text-sm font-semibold tracking-tight">CodeLens</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <a href="https://github.com/Arnab-iitkgp/codelens" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors">
+                <Github className="h-5 w-5" />
+                <span className="hidden sm:inline-block">GitHub</span>
+              </a>
               {isAuthenticated ? (
                 <Link href="/dashboard/home">
                   <Button size="sm" className="bg-white text-black hover:bg-zinc-200 rounded-full px-5 h-9 text-sm font-medium">
@@ -95,6 +100,10 @@ export default async function Home() {
                     <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
+                <a href="https://github.com/Arnab-iitkgp/codelens" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm sm:text-base font-medium text-zinc-400 hover:text-white transition-colors group ml-2">
+                  <Star className="h-[18px] w-[18px] fill-zinc-400 group-hover:fill-white transition-colors" />
+                  Star on GitHub
+                </a>
               </div>
             )}
             <p className="mt-8 text-sm text-zinc-500">
@@ -208,8 +217,12 @@ export default async function Home() {
             </div>
             <div className="flex items-center gap-6">
               <Link href="/demo" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Demo</Link>
-              <Link href="/login" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Sign in</Link>
-              <a href="https://github.com/codelenshq" target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">GitHub</a>
+              {isAuthenticated ? (
+                <Link href="/dashboard/home" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Dashboard</Link>
+              ) : (
+                <Link href="/login" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Sign in</Link>
+              )}
+              <a href="https://github.com/Arnab-iitkgp/codelens" target="_blank" rel="noopener noreferrer" className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">GitHub</a>
             </div>
             <p className="text-sm text-zinc-600">
               © {new Date().getFullYear()} CodeLens
