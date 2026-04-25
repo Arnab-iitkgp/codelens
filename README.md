@@ -1,8 +1,31 @@
 # CodeLens
 
-> Code reviews with zero blind spots
+<p align="center">
+  <strong>Code reviews with zero blind spots</strong>
+</p>
+
+<p align="center">
+  <a href="https://codelens-app.vercel.app">
+    <img src="https://img.shields.io/badge/Try%20Demo-Live%20Link-blue?style=for-the-badge&logo=vercel" alt="Live Demo" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="./public/landing.png" width="100%" alt="CodeLens Landing" />
+  <img src="./public/dashboard.png" width="49.5%" alt="CodeLens Dashboard" />
+  <img src="./public/demo.png" width="49.5%" alt="CodeLens Demo" />
+</p>
 
 CodeLens is an AI-powered code review tool that automatically analyzes pull requests line-by-line to surface bugs, performance issues, and architectural smells—instantly. Built for teams that move fast and care about code quality.
+
+## AI Reviews in Action
+
+<p align="center">
+  <img src="./public/review%20left.png" width="49.5%" alt="Review Left" />
+  <img src="./public/review%20right.png" width="49.5%" alt="Review Right" />
+</p>
+
+
 
 
 ##  Features
@@ -118,49 +141,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-##  Project Structure
-
-```
-codelens/
-├── app/                    # Next.js App Router pages
-│   ├── (auth)/             # Authentication routes
-│   ├── api/                # API routes
-│   │   ├── auth/           # Auth endpoints
-│   │   ├── inngest/        # Inngest webhooks
-│   │   └── webhooks/       # GitHub webhooks
-│   ├── dashboard/          # Dashboard pages
-│   │   ├── home/           # Dashboard home
-│   │   ├── repository/     # Repository management
-│   │   ├── reviews/        # Code reviews
-│   │   ├── settings/       # User settings
-│   │   └── subscription/   # Subscription management
-│   ├── layout.tsx          # Root layout
-│   └── page.tsx            # Landing page
-├── components/             # React components
-│   ├── ui/                 # UI components (Shadcn UI)
-│   ├── providers/          # Context providers
-│   └── app-sidebar.tsx     # Main sidebar
-├── lib/                    # Utility libraries
-│   ├── auth.ts             # Better Auth configuration
-│   ├── auth-client.ts      # Client-side auth
-│   ├── db.ts               # Prisma client
-│   └── utils.ts            # Utility functions
-├── module/                 # Feature modules
-│   ├── ai/                 # AI/RAG functionality
-│   ├── auth/               # Authentication
-│   ├── dashboard/          # Dashboard features
-│   ├── github/             # GitHub integration
-│   ├── payment/            # Payment/subscription
-│   ├── repository/         # Repository management
-│   └── review/             # Review functionality
-├── inngest/                # Inngest functions
-│   └── functions/          # Background job functions
-├── prisma/                 # Database schema & migrations
-│   └── schema.prisma       # Prisma schema
-└── public/                 # Static assets
-```
 
 ##  Key Features Explained
+
 
 ### Automatic Code Reviews
 
@@ -180,6 +163,25 @@ Inngest handles asynchronous tasks like:
 - Processing PR reviews
 - Syncing repository data
 - Updating subscription status
+
+## 🚀 Performance Optimizations
+
+### High-Speed Repository Indexing
+CodeLens implements a highly optimized repository indexing pipeline to minimize onboarding latency. 
+
+| Metric | Sequential (Baseline) | Parallel (Optimized) | Improvement |
+| :--- | :--- | :--- | :--- |
+| **File Fetching** | ~25,000ms | **~1,700ms** | **14.7x faster** |
+| **AI Embedding** | ~18,000ms | **~12,000ms** | **1.5x faster** |
+| **Total Time** | ~43s | **~14s** | **3.1x faster** |
+
+![Indexing Performance Comparison](./public/performance-comparison.png)
+
+#### Key Technical Advancements:
+- **Git Trees API Architecture**: Replaced recursive `getContent` calls (O(N) network requests) with the Git Trees API to retrieve the entire repository structure in a single O(1) request.
+- **Bounded Concurrency**: Implemented `p-map` for parallel blob fetching (concurrency: 10) and embedding generation (concurrency: 5), ensuring high throughput while staying within GitHub and Gemini API rate limits.
+- **Efficient Filtering**: Real-time filtering of non-code blobs and large binary assets during the fetching phase to reduce unnecessary AI processing costs.
+
 
 
 ##  Authentication
