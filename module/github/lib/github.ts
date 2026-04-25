@@ -158,48 +158,49 @@ export const getRepoFileContents = async (
   repo: string,
   path: string = ""
 ): Promise<{ path: string, content: string }[]> => {
+  const pMap = (await import("p-map")).default;
   const octokit = new Octokit({ auth: token })
-  const { data } = await octokit.rest.repos.getContent({
-    owner, repo, path
-  })
 
-  if (!Array.isArray(data)) {
-    //its a file then
-    if (data.type == 'file' && data.content) {
-      return [{
-        path: data.path,
-        content: Buffer.from(data.content, "base64").toString("utf-8")
-      }];
-    }
-    return []
-  }
+  // Step 1: Get entire repo tree in a single API call
+  const { data: tree } = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: "HEAD",
+    recursive: "true",
+  });
 
-  let files: { path: string, content: string }[] = [];
-  for (const item of data) {
-    if (item.type === "file") {
-      const { data: fileData } = await octokit.rest.repos.getContent({
-        owner, repo, path: item.path
-      })
-      if (!Array.isArray(fileData) && fileData.type === "file" && fileData.content) {
+  // Step 2: Filter to code files only
+  const codeBlobs = tree.tree.filter((item) => {
+    if (item.type !== "blob" || !item.path || !item.sha) return false;
+    if (item.path.match(/\.(png|jpg|jpeg|gif|svg|pdf|gz|tar|ico|woff|woff2|ttf|eot|mp4|webm|zip)$/i)) return false;
+    if (item.path.match(/(^|\/)node_modules\//)) return false;
+    if (item.path.match(/package-lock\.json|bun\.lock|yarn\.lock$/)) return false;
+    return true;
+  });
 
-        //filter out non code files if needed like icons ,images zip etc
-        if (!item.path.match(/\.(png|jpg|jpeg|gif|svg|pdf|svg|gz|tar|ico)$/i)) {
-          files.push({
-            path: item.path,
-            content: Buffer.from(fileData.content, "base64").toString("utf-8")
-          })
-        }
+  // Step 3: Fetch blob contents in parallel (max 10 at a time)
+  const files = await pMap(
+    codeBlobs,
+    async (blob) => {
+      try {
+        const { data } = await octokit.rest.git.getBlob({
+          owner,
+          repo,
+          file_sha: blob.sha!,
+        });
+        return {
+          path: blob.path!,
+          content: Buffer.from(data.content, "base64").toString("utf-8"),
+        };
+      } catch (error) {
+        console.error(`Failed to fetch blob: ${blob.path}`, error);
+        return null;
       }
+    },
+    { concurrency: 10 }
+  );
 
-
-    }
-    else if (item.type == "dir") {
-      //calling recursively the inside file diretory files
-      const subFiles = await getRepoFileContents(token, owner, repo, item.path)
-      files = files.concat(subFiles);
-    }
-  }
-  return files
+  return files.filter((f): f is { path: string; content: string } => f !== null);
 }
 
 export const getPullRequestDiff = async (

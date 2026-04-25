@@ -38,33 +38,37 @@ export async function indexCodebase(
   repoId: string,
   files: { path: string; content: string }[]
 ) {
-  const vectors = [];
-  for (const file of files) {
-    const content = `File:  ${file.path}\n\n${file.content}`;
-    const truncatedContent = content.slice(0, 8000); // for token limit taking 8000 chars, can extend later on requirement
-    try {
-      const embedding = await generateEmbedding(truncatedContent);
+  const pMap = (await import("p-map")).default;
+  const vectors = await pMap(
+    files,
+    async (file) => {
+      const content = `File:  ${file.path}\n\n${file.content}`;
+      const truncatedContent = content.slice(0, 8000); // 8000 char token limit
+      try {
+        const embedding = await generateEmbedding(truncatedContent);
+        return {
+          id: `${repoId}-${file.path.replace(/\//g, "-")}`,
+          values: embedding,
+          metadata: {
+            repoId,
+            path: file.path,
+            content: truncatedContent,
+          },
+        };
+      } catch (error) {
+        console.error(`Failed to generate embedding for file:${file.path}, error: ${error}`);
+        return null;
+      }
+    },
+    { concurrency: 5 } // 5 at a time to stay safe on API limits
+  );
+  
+  const validVectors = vectors.filter(Boolean) as any[];
 
-      vectors.push({
-        id: `${repoId}-${file.path.replace(/\//g, "-")}`,
-        values: embedding,
-        metadata: {
-          repoId,
-          path: file.path,
-          content: truncatedContent,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "Failed to generate embedding for file:" + file.path + ",error:" + error
-      );
-    }
-  }
-
-  if (vectors.length > 0) {
+  if (validVectors.length > 0) {
     const batchSize = 100;
-    for (let i = 0; i < vectors.length; i += batchSize) {
-      const chunk = vectors.slice(i, i + batchSize);
+    for (let i = 0; i < validVectors.length; i += batchSize) {
+      const chunk = validVectors.slice(i, i + batchSize);
       await pineconeIndex.upsert(chunk);
     }
   }
