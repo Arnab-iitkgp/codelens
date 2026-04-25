@@ -21,15 +21,26 @@ export const indexRepo  =inngest.createFunction(
           throw new Error("No Github access token found")
         }
 
-        return await getRepoFileContents(account.accessToken,owner,repo);
+        const startFetch = Date.now();
+        const result = await getRepoFileContents(account.accessToken,owner,repo);
+        console.log(`[INDEXING] Fetched ${result.length} files in ${Date.now() - startFetch}ms`);
+        return result;
       })
 
       await step.run("index-codebase",async ()=>{
-        // await indexCodebase
+        const startIndex = Date.now();
         await indexCodebase(`${owner}/${repo}`,files)
+        console.log(`[INDEXING] Embedded ${files.length} files in ${Date.now() - startIndex}ms`);
       })
+
+      // Store indexed file count on the repository
+      await step.run("update-repo-metadata", async () => {
+        await prisma.repository.updateMany({
+          where: { owner, name: repo },
+          data: { indexedFileCount: files.length },
+        });
+      });
+
       return{success:true,indexedFiles:files.length }
   }
-)
-
-//TODO: Add error handling and retries and optimizations
+)
