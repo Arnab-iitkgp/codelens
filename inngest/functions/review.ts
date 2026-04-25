@@ -9,8 +9,7 @@ import { generateText } from "ai";
 import { retrieveContext } from "@/module/ai/lib/rag";
 
 export const generateReview=inngest.createFunction(
-  { id: "generate-review" },
-  { event: "pr.review.requested" },
+  { id: "generate-review", triggers: [{ event: "pr.review.requested" }] },
   async ({ event, step }) => {
     const { owner, repo, prNumber, userId } = event.data;
     const { diff, title, description, token } = await step.run(

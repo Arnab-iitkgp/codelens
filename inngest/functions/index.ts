@@ -3,9 +3,8 @@ import { inngest } from "../client";
 import { getRepoFileContents } from "@/module/github/lib/github";
 import { indexCodebase } from "@/module/ai/lib/rag";
 
-export const indexRepo  =inngest.createFunction(
-  {id:"index-repo"},
-  {event:"repository.connected"},
+export const indexRepo  = inngest.createFunction(
+  {id:"index-repo", triggers: [{event:"repository.connected"}]},
   async({event,step})=>{
       const {owner,repo,userId} =event.data
       
@@ -43,4 +42,4 @@ export const indexRepo  =inngest.createFunction(
 
       return{success:true,indexedFiles:files.length }
   }
-)
+)

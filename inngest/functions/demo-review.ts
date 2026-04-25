@@ -8,8 +8,7 @@ import { retrieveContext } from "@/module/ai/lib/rag";
 const DEMO_BRANCH_PREFIX = "demo-review-";
 
 export const generateDemoReview = inngest.createFunction(
-  { id: "generate-demo-review" },
-  { event: "demo.review.requested" },
+  { id: "generate-demo-review", triggers: [{ event: "demo.review.requested" }] },
   async ({ event, step }) => {
     const { demoReviewId, files } = event.data as {
       demoReviewId: string;
