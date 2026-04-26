@@ -4,12 +4,23 @@ import {
   getPullRequestDiff,
   postReviewComment,
 } from "@/module/github/lib/github";
-import { getLanguageModel } from "@/module/ai/lib/models";
-import { generateText } from "ai";
+import { getLanguageModel, generateTextWithFallback } from "@/module/ai/lib/models";
 import { retrieveContext } from "@/module/ai/lib/rag";
 
-export const generateReview=inngest.createFunction(
-  { id: "generate-review", triggers: [{ event: "pr.review.requested" }] },
+export const generateReview = inngest.createFunction(
+  {
+    id: "generate-review",
+    triggers: [{ event: "pr.review.requested" }],
+    // prevent duplicate procssing of the same webhook event
+    idempotency: "event.id",
+    // If a new review is requested for the same pr, cancel the cur running one
+    cancelOn: [
+      {
+        event: "pr.review.requested",
+        match: "data.prNumber",
+      },
+    ],
+  },
   async ({ event, step }) => {
     const { owner, repo, prNumber, userId } = event.data;
     const { diff, title, description, token } = await step.run(
@@ -68,10 +79,7 @@ Please provide:
 
 Format your response in markdown.`;
 
-      const { text } = await generateText({
-        model: getLanguageModel(),
-        prompt,
-      });
+      const { text } = await generateTextWithFallback(prompt);
       return text;
     });
     await step.run("post -comment", async () => {

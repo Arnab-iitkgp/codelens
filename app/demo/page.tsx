@@ -44,7 +44,7 @@ export default function DemoPage() {
   const [demoPrUrl, setDemoPrUrl] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   const [isRepoCollapsed, setIsRepoCollapsed] = useState(false);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [isCopied, setIsCopied] = useState(false);
@@ -140,7 +140,10 @@ export default function DemoPage() {
   }, []);
 
   const getModifiedFiles = useCallback(() => {
-    return files.filter((f) => f.currentContent !== f.originalContent);
+    const normalize = (text: string) => 
+      text.replace(/\r/g, "").split("\n").map(l => l.trimEnd()).join("\n").trim();
+      
+    return files.filter((f) => normalize(f.currentContent) !== normalize(f.originalContent));
   }, [files]);
 
   const modifiedCount = getModifiedFiles().length;
@@ -154,7 +157,7 @@ export default function DemoPage() {
 
     setStatus("pending");
     setReviewResult("");
-    setCurrentStep("Creating branch & PR on GitHub...");
+    setCurrentStep("Creating branch & PR on GitHub");
     setElapsedSeconds(0);
 
     try {
@@ -231,6 +234,8 @@ export default function DemoPage() {
     setActiveFile(path);
   };
 
+  const [activeTab, setActiveTab] = useState<"code" | "analysis">("code");
+
   const isProcessing = status === "pending" || status === "reviewing";
   const activeFileData = files.find((f) => f.path === activeFile);
   const lineCount = activeFileData ? activeFileData.currentContent.split("\n").length : 0;
@@ -249,24 +254,24 @@ export default function DemoPage() {
   return (
     <div className="h-screen bg-background flex flex-col font-sans overflow-hidden dark text-foreground">
       {/* Top Application Bar */}
-      <header className="h-[52px] border-b bg-background flex items-center justify-between px-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
+      <header className="h-[52px] border-b bg-background flex items-center justify-between px-4 flex-shrink-0 z-50">
+        <div className="flex items-center gap-4 min-w-0">
+          <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80 cursor-pointer shrink-0">
             <img src="/codelens-logo.png" alt="CodeLens Logo" className="h-6 w-auto" />
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">CodeLens Workspace</span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider bg-primary/10 text-primary border border-primary/20">
+              <span className="font-semibold text-sm truncate max-w-[120px] sm:max-w-none">CodeLens</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider bg-primary/10 text-primary border border-primary/20 shrink-0">
                 LIVE DEMO
               </span>
             </div>
-          </div>
+          </Link>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border/50 bg-muted/30 px-2 py-1.5 rounded pr-3">
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border/50 bg-muted/30 px-2 py-1.5 rounded pr-3 shrink-0">
             <AlertCircle className="h-3.5 w-3.5 text-primary/70" />
             <span><strong className="text-foreground/80">2 demos</strong> limit per day</span>
           </div>
-          <Link href="/login">
+          <Link href="/login" className="shrink-0">
             <Button size="sm" variant="default" className="h-8">
               Sign In
             </Button>
@@ -275,13 +280,31 @@ export default function DemoPage() {
       </header>
 
       {/* Main Split Interface */}
-      <main className="flex-1 flex min-h-0 bg-muted/30">
+      <main className="flex-1 flex flex-col md:flex-row min-h-0 bg-muted/30 relative">
+        {/* Mobile Tab Switcher */}
+        <div className="flex md:hidden bg-background border-b h-10 flex-shrink-0 items-center px-1">
+          <button 
+            onClick={() => setActiveTab("code")}
+            className={`flex-1 h-8 flex items-center justify-center gap-2 text-xs font-medium rounded-md transition-colors ${activeTab === "code" ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <FileCode className="h-3.5 w-3.5" />
+            Code
+          </button>
+          <button 
+            onClick={() => setActiveTab("analysis")}
+            className={`flex-1 h-8 flex items-center justify-center gap-2 text-xs font-medium rounded-md transition-colors ${activeTab === "analysis" ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <TerminalSquare className="h-3.5 w-3.5" />
+            Analysis {isProcessing && <Loader2 className="h-2.5 w-2.5 animate-spin" />}
+          </button>
+        </div>
+
         {/* Left Pane: True IDE (Sidebar + Editor) */}
-        <section className="flex-1 flex min-w-0 border-r border-border bg-[#1e1e1e]">
+        <section className={`flex-1 flex min-w-0 border-r border-border bg-[#1e1e1e] ${activeTab === "code" ? "flex" : "hidden md:flex"}`}>
 
           {/* File Explorer Sidebar */}
           {isSidebarVisible && (
-            <div className="w-56 flex flex-col border-r border-[#333] bg-[#252526] flex-shrink-0 hidden lg:flex">
+            <div className="w-48 sm:w-56 flex flex-col border-r border-[#333] bg-[#252526] flex-shrink-0">
               <div className="h-[38px] flex items-center justify-between pl-4 pr-2 text-[11px] font-semibold tracking-wider text-[#ccc]">
                 EXPLORER
                 <button
@@ -352,7 +375,6 @@ export default function DemoPage() {
                   <PanelLeft className="h-4 w-4" />
                 </button>
               )}
-
               {/* Scrolling Tabs Container */}
               <div className="flex-1 flex overflow-x-auto items-stretch [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {openFiles.map((path) => {
@@ -417,11 +439,93 @@ export default function DemoPage() {
               <div className="flex-1 flex overflow-hidden relative bg-[#1e1e1e]">
                 {/* Gutter */}
                 <div className="w-12 bg-[#1e1e1e] border-r border-[#333] text-[#858585] text-right font-mono text-[14px] leading-[21px] py-[16px] select-none flex-shrink-0 z-10 overflow-hidden">
-                  {Array.from({ length: lineCount }).map((_, i) => (
-                    <div key={i} className="pr-3 opacity-60 h-[21px]">
-                      {i + 1}
-                    </div>
-                  ))}
+                  {(() => {
+                    const originalLines = (activeFileData?.originalContent || "").split("\n").map(l => l.replace(/\r$/, ""));
+                    const currentLines = (activeFileData?.currentContent || "").split("\n").map(l => l.replace(/\r$/, ""));
+                    
+                    // Longest Common Subsequence (LCS) matrix
+                    const dp: number[][] = Array(originalLines.length + 1).fill(0).map(() => Array(currentLines.length + 1).fill(0));
+                    
+                    for (let i = 1; i <= originalLines.length; i++) {
+                      for (let j = 1; j <= currentLines.length; j++) {
+                        if (originalLines[i - 1] === currentLines[j - 1]) {
+                          dp[i][j] = dp[i - 1][j - 1] + 1;
+                        } else {
+                          dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                        }
+                      }
+                    }
+                    
+                    // Backtrack to find precisely which current lines are part of the original file
+                    const isOriginal = Array(currentLines.length).fill(false);
+                    const originalMappedTo = Array(originalLines.length).fill(-1);
+                    
+                    let i = originalLines.length;
+                    let j = currentLines.length;
+                    
+                    while (i > 0 && j > 0) {
+                      if (originalLines[i - 1] === currentLines[j - 1]) {
+                        isOriginal[j - 1] = true;
+                        originalMappedTo[i - 1] = j - 1;
+                        i--;
+                        j--;
+                      } else if (dp[i - 1][j] > dp[i][j - 1]) {
+                        i--;
+                      } else {
+                        j--;
+                      }
+                    }
+                    
+                    // Track deletions: if an original line wasn't mapped, it was deleted.
+                    const deletionsAtCurrentLine = Array(currentLines.length + 1).fill(false);
+                    let nextMappedCurrIndex = currentLines.length; 
+                    for (let k = originalLines.length - 1; k >= 0; k--) {
+                      if (originalMappedTo[k] !== -1) {
+                         nextMappedCurrIndex = originalMappedTo[k];
+                      } else {
+                         deletionsAtCurrentLine[nextMappedCurrIndex] = true;
+                      }
+                    }
+                    
+                    return (
+                      <>
+                        {currentLines.map((_, index) => {
+                          const isChanged = !isOriginal[index];
+                          
+                          // A true IDE does not show a red deletion triangle if the gap was replaced 
+                          // by newly added/modified lines (Blue). We swallow the marker if the line above is changed.
+                          const hasDeletionBefore = deletionsAtCurrentLine[index] && (index === 0 || isOriginal[index - 1]);
+                          
+                          return (
+                            <div key={index} className="relative pr-3 opacity-60 h-[21px]">
+                              {/* Deletion marker: Red right-pointing triangle */}
+                              {hasDeletionBefore && (
+                                <div 
+                                  className="absolute left-0 top-[-5px] z-20 w-0 h-0 border-y-[5px] border-y-transparent border-r-0 border-l-[5px] border-l-[#f14c4c]" 
+                                  title="Deleted line(s) above" 
+                                />
+                              )}
+                              
+                              {/* Modified/Added marker: Blue bar */}
+                              {isChanged && (
+                                <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#007acc]" title="Modified/Added" />
+                              )}
+                              {index + 1}
+                            </div>
+                          );
+                        })}
+                        {/* Edge case: Deletions at the very end of the file */}
+                        {(deletionsAtCurrentLine[currentLines.length] && (currentLines.length === 0 || isOriginal[currentLines.length - 1])) && (
+                          <div className="relative pr-3 opacity-60 h-0">
+                            <div 
+                              className="absolute left-0 top-[-5px] z-20 w-0 h-0 border-y-[5px] border-y-transparent border-r-0 border-l-[5px] border-l-[#f14c4c]" 
+                              title="Deleted line(s) below" 
+                            />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Code Editor */}
@@ -518,7 +622,7 @@ export default function DemoPage() {
         </section>
 
         {/* Right Pane: Output Console */}
-        <section className="flex-1 flex flex-col min-w-0 bg-background relative">
+        <section className={`flex-1 flex flex-col min-w-0 bg-background relative ${activeTab === "analysis" ? "flex" : "hidden md:flex"}`}>
           {/* Output Header */}
           <div className="h-[38px] bg-muted/50 border-b flex items-center justify-between px-4 flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -561,18 +665,59 @@ export default function DemoPage() {
 
             {/* Processing State */}
             {isProcessing && (
-              <div className="font-mono text-[13px] space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b">
-                  <span className="text-foreground font-semibold">Running CodeLens Pipeline...</span>
-                  <span className="text-muted-foreground">{elapsedSeconds}s elapsed</span>
+              <div className="font-mono text-[13px] space-y-6">
+                <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                  <span className="text-foreground font-semibold">
+                    Running CodeLens Pipeline
+                  </span>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span>{elapsedSeconds}s elapsed</span>
+                    <span className="text-[11px] opacity-60 px-1.5 py-0.5 bg-muted rounded border border-border/50">avg. ~20s</span>
+                  </div>
                 </div>
-                <div className="space-y-2 text-muted-foreground pl-2 border-l-2 border-primary">
-                  <p className="flex items-center gap-2">
-                    <span className="text-primary">✓</span> Detected {modifiedCount} modified file{modifiedCount !== 1 ? "s" : ""}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <span className="text-primary animate-pulse">⟳</span> {currentStep}
-                  </p>
+
+                <div className="space-y-3 text-muted-foreground pl-3 border-l-2 border-primary/50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-primary text-[12px] w-3 flex justify-center">✓</span>
+                    <span className="text-foreground/80">Detected {modifiedCount} modified file{modifiedCount !== 1 ? "s" : ""}</span>
+                  </div>
+
+                  {[
+                    "Creating branch & PR on GitHub",
+                    "Fetching codebase context via RAG",
+                    "Analyzing code changes with Gemini AI",
+                    "Posting review on Pull Request"
+                  ].map((stepText, idx) => {
+                    const stepOrder = [
+                      "Creating branch & PR on GitHub",
+                      "Fetching codebase context via RAG",
+                      "Analyzing code changes with Gemini AI",
+                      "Posting review on Pull Request",
+                      "Done"
+                    ];
+                    const currentIndex = stepOrder.indexOf(currentStep);
+                    const isCompleted = currentIndex > idx || currentStep === "Done";
+                    const isActive = currentIndex === idx;
+
+                    return (
+                      <div key={idx} className="flex items-center gap-3">
+                        {isCompleted ? (
+                          <span className="text-primary text-[12px] w-3 flex justify-center">✓</span>
+                        ) : isActive ? (
+                          <span className="text-primary animate-spin text-[14px] w-3 flex justify-center">⟳</span>
+                        ) : (
+                          <span className="text-muted-foreground/30 text-[10px] w-3 flex justify-center">○</span>
+                        )}
+                        <span className={`
+                          transition-colors duration-300
+                          ${isCompleted ? "text-foreground/60" : 
+                            isActive ? "text-primary font-medium" : "text-muted-foreground/30"}
+                        `}>
+                          {stepText}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

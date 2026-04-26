@@ -1,21 +1,3 @@
-/**
- * Central AI Provider Factory
- *
- * Makes the codebase model-agnostic. To switch providers, just update
- * these env vars in .env:
- *
- *   AI_PROVIDER=google|openai|groq              (default: google)
- *   AI_MODEL_ID=gemini-2.5-flash                (default: gemini-2.5-flash)
- *   AI_EMBEDDING_PROVIDER=google|openai|huggingface  (default: google)
- *   AI_EMBEDDING_MODEL_ID=text-embedding-004    (default: text-embedding-004)
- *
- * Required API key env vars per provider:
- *   google      → GOOGLE_GENERATIVE_AI_API_KEY
- *   openai      → OPENAI_API_KEY
- *   groq        → GROQ_API_KEY
- *   huggingface → HUGGINGFACE_API_KEY
- */
-
 import { google } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { groq } from "@ai-sdk/groq";
@@ -25,7 +7,7 @@ import { groq } from "@ai-sdk/groq";
 type AIProvider = "google" | "openai" | "groq";
 
 const DEFAULT_PROVIDER: AIProvider = "google";
-const DEFAULT_MODEL_ID = "gemini-2.5-flash";
+const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite-preview";
 
 export function getLanguageModel() {
   const provider = (process.env.AI_PROVIDER as AIProvider) || DEFAULT_PROVIDER;
@@ -63,4 +45,50 @@ export function getEmbeddingModel() {
     default:
       return google.textEmbeddingModel(modelId);
   }
+}
+
+//Circuit Breaker / Fallback Generation
+import { generateText as aiGenerateText } from "ai";
+
+export async function generateTextWithFallback(prompt: string) {
+  const primaryProvider = (process.env.AI_PROVIDER as AIProvider) || DEFAULT_PROVIDER;
+
+  // Seq of fallbacks to try in order
+  const fallbackOrder: AIProvider[] = [primaryProvider];
+  if (primaryProvider !== "google") fallbackOrder.push("google");
+  if (primaryProvider !== "groq") fallbackOrder.push("groq");
+  if (primaryProvider !== "openai") fallbackOrder.push("openai");
+
+  let lastError = null;
+
+  for (const provider of fallbackOrder) {
+    try {
+      let model;
+      if (provider === "google") {
+        model = google(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+      } else if (provider === "groq") {
+        model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
+      } else if (provider === "openai") {
+        model = openai(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gpt-4o-mini");
+      }
+
+      if (!model) throw new Error("No model mapped for provider");
+
+      const response = await aiGenerateText({
+        model,
+        prompt,
+      });
+
+      if (provider !== primaryProvider) {
+        console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed. Successfully rerouted to '${provider}' with zero downtime.`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error(`[AI Provider Failed] Attempted ${provider}, failed with:`, error);
+      lastError = error;
+    }
+  }
+
+  throw new Error(`[AI Circuit Breaker] ALL underlying AI providers failed. Last Error: ${lastError}`);
 }

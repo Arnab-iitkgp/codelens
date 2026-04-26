@@ -178,8 +178,10 @@ CodeLens implements a highly optimized repository indexing pipeline to minimize 
 ![Indexing Performance Comparison](./public/performance-comparison.png)
 
 #### Key Technical Advancements:
-- **Git Trees API Architecture**: Replaced recursive `getContent` calls (O(N) network requests) with the Git Trees API to retrieve the entire repository structure in a single O(1) request.
-- **Bounded Concurrency**: Implemented `p-map` for parallel blob fetching (concurrency: 10) and embedding generation (concurrency: 5), ensuring high throughput while staying within GitHub and Gemini API rate limits.
+- **Sequential AI Fallback Layer**: Architected a provider-agnostic AI abstraction layer utilizing a sequential fallback strategy, ensuring zero-downtime and automated request rerouting across Gemini, OpenAI, and Groq during API degradation.
+- **Event-Driven Idempotency**: Configured Inngest to filter duplicate GitHub webhooks and dynamically cancel outdated AI tasks upon new commits, preventing redundant PR comments and wasted LLM token spend.
+- **Git Trees API Architecture**: Replaced recursive directory traversal (`getContent` calls) with the Git Trees API, reducing repository structure discovery to a single network request.
+- **Bounded Concurrency**: Replaced sequential O(N) file fetching with parallelized blob retrieval (`p-map` concurrency: 10). Parallelized embedding generation (concurrency: 5) ensures high throughput while preventing rate-limit throttling from GitHub and Gemini APIs.
 - **Efficient Filtering**: Real-time filtering of non-code blobs and large binary assets during the fetching phase to reduce unnecessary AI processing costs.
 
 

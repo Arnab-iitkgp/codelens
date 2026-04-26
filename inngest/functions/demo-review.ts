@@ -1,14 +1,25 @@
 import { inngest } from "../client";
 import prisma from "@/lib/db";
-import { getLanguageModel } from "@/module/ai/lib/models";
-import { generateText } from "ai";
+import { getLanguageModel, generateTextWithFallback } from "@/module/ai/lib/models";
 import { Octokit } from "octokit";
 import { retrieveContext } from "@/module/ai/lib/rag";
 
 const DEMO_BRANCH_PREFIX = "demo-review-";
 
 export const generateDemoReview = inngest.createFunction(
-  { id: "generate-demo-review", triggers: [{ event: "demo.review.requested" }] },
+  { 
+    id: "generate-demo-review",
+    triggers: [{ event: "demo.review.requested" }],
+    // Handle idempotency for duplicate demo triggers
+    idempotency: "event.id",
+    // Cancel any existing demo reviews if a new one is started for the same ID
+    cancelOn: [
+      {
+        event: "demo.review.requested",
+        match: "data.demoReviewId",
+      },
+    ],
+  },
   async ({ event, step }) => {
     const { demoReviewId, files } = event.data as {
       demoReviewId: string;
@@ -119,7 +130,7 @@ export const generateDemoReview = inngest.createFunction(
           prNumber,
           prUrl,
           status: "reviewing",
-          currentStep: "AI analyzing code diff across modified files",
+          currentStep: "Fetching codebase context via RAG",
         },
       });
     });
@@ -140,7 +151,16 @@ export const generateDemoReview = inngest.createFunction(
     const context = await step.run("retrieve-demo-context", async () => {
       const repoId = `${owner}/${repo}`;
       const query = `[Demo] Code changes across ${files.length} file(s)\n${files.map(f => f.path).join(", ")}`;
-      return await retrieveContext(query, repoId);
+      const results = await retrieveContext(query, repoId);
+      
+      await prisma.demoReview.update({
+        where: { id: demoReviewId },
+        data: {
+          currentStep: "Analyzing code changes with Gemini AI",
+        },
+      });
+      
+      return results;
     });
 
     // Step 4: Generate AI review with codebase context
@@ -168,10 +188,7 @@ Please provide:
 
 Format your response in markdown.`;
 
-      const { text } = await generateText({
-        model: getLanguageModel(),
-        prompt,
-      });
+      const { text } = await generateTextWithFallback(prompt);
       return text;
     });
 
