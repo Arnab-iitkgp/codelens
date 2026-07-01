@@ -5,7 +5,7 @@ import {
   postReviewComment,
 } from "@/module/github/lib/github";
 import { getLanguageModel, generateTextWithFallback } from "@/module/ai/lib/models";
-import { retrieveContext } from "@/module/ai/lib/rag";
+import { retrieveContext, retrieveContextForDiff, type RetrievedChunk } from "@/module/ai/lib/rag";
 
 export const generateReview = inngest.createFunction(
   {
@@ -49,11 +49,36 @@ export const generateReview = inngest.createFunction(
       }
     );
 
-    //retrieve context
+    //retrieve context — diff-driven, per-hunk; fall back to title+description
+    // if the diff yields nothing embeddable (empty PR, binary-only, etc.).
     const context = await step.run("retrieve-context", async () => {
-      const query = `${title}\n${description}`;
-      return await retrieveContext(query, `${owner}/${repo}`);
+      const repoId = `${owner}/${repo}`;
+      const chunks = await retrieveContextForDiff(diff, repoId);
+      if (chunks.length > 0) {
+        console.log(`[review] diff-driven retrieval hit: ${chunks.length} chunks`);
+        return { mode: "diff" as const, chunks };
+      }
+      console.log(`[review] diff yielded no hunks, falling back to title/desc query`);
+      const fallback= (await retrieveContext(`${title}\n${description}`, repoId)) ?? [];
+      const chunksFromFallback: RetrievedChunk[] = fallback.map((content) => ({
+        path: "(unknown)",
+        content,
+        score: 0,
+      }));
+      return { mode: "fallback" as const, chunks: chunksFromFallback };
     });
+
+    // Format context as labeled snippets so the model can cite the source file.
+    const contextBlock =
+      context.chunks.length === 0
+        ? "(no relevant context retrieved from the codebase index)"
+        : context.chunks
+            .map(
+              (c) =>
+                `### ${c.path}${c.score ? ` (relevance ${c.score.toFixed(2)})` : ""}\n${c.content}`
+            )
+            .join("\n\n");
+
     //generate review
     const review = await step.run("generate-ai-review", async () => {
       const prompt = `You are an expert code reviewer. Analyze the following pull request and provide a detailed, constructive code review.
@@ -61,8 +86,8 @@ export const generateReview = inngest.createFunction(
 PR Title: ${title}
 PR Description: ${description || "No description provided"}
 
-Context from Codebase:
-${context.join("\n\n")}
+Context from Codebase (retrieved per-hunk from the diff; each snippet is labeled with its file path):
+${contextBlock}
 
 Code Changes:
 \`\`\`diff
