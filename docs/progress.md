@@ -93,6 +93,15 @@
 - Revised scope: Phases 0, 0.5, 1(partial), 3, 5 + Agent Trace UI
 - **Next session:** Start Phase 0.2 — structured JSON findings with Zod schema
 
+### 2026-08-20 — Implementation of Phase 0 & Phase 1
+- Completed Phase 0.2: Migrated to Vercel AI SDK `generateObject` with strict Zod schema for structured JSON findings.
+- Completed Phase 0.3: Migrated from issue comments to inline GitHub PR reviews with a 422 error circuit breaker.
+- Completed Phase 0.4: Implemented adversarial "defense" agent loop to refute false positives.
+- Completed Phase 0.5: Implemented deterministic Existence Checks using `parse-diff` to validate file paths and line numbers.
+- Upgraded Eval Harness: Added AI Provider fallback logic (Groq -> Google -> OpenAI) and rate-limit delays for stable testing.
+- Completed Phase 0.6 & 1: Added `architectureProfile` to Prisma, built a heuristic GitHub Tree file sampler (scoring config and src files), and wired up a new Inngest background job to auto-generate architectural conventions.
+- **Next session:** Decide between Phase 0.7 (Large PR Chunking) or Phase 3 (Tree-Sitter WASM code intelligence).
+
 ---
 
 ## Blockers / Open Questions
