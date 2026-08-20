@@ -5,7 +5,7 @@ import {
   postReviewComment,
   postInlineReview
 } from "@/module/github/lib/github";
-import { runReview } from "@/module/review/lib/engine";
+import { runReview, type ReviewOutput } from "@/module/review/lib/engine";
 
 export const generateReview = inngest.createFunction(
   {
@@ -23,7 +23,7 @@ export const generateReview = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { owner, repo, prNumber, userId } = event.data;
-    const { diff, title, description, token } = await step.run(
+    const { diff, title, description, token, architectureProfile } = await step.run(
       "fetch-pr-diff",
       async () => {
         const account = await prisma.account.findFirst({
@@ -42,12 +42,18 @@ export const generateReview = inngest.createFunction(
           repo,
           prNumber
         );
+        
+        const repository = await prisma.repository.findFirst({
+          where: { owner, name: repo },
+        });
+
         return {
           ...data,
           token: account.accessToken,
+          architectureProfile: (repository as any)?.architectureProfile,
         };
       }
-    );
+    ) as { diff: string, title: string, description: string, token: string, architectureProfile: string | null | undefined };
 
     // Retrieve + generate happen inside runReview so both Inngest (here) and
     // the eval harness call the exact same pipeline. The two used to be
@@ -59,12 +65,13 @@ export const generateReview = inngest.createFunction(
         title,
         description,
         repoId: `${owner}/${repo}`,
+        architectureProfile,
       });
       console.log(
         `[review] engine done: ${latencyMs}ms, retrieval=${meta.retrievalMode}, chunks=${meta.chunkCount}, provider=${meta.provider}`
       );
       return { output, structured };
-    });
+    }) as { output: string, structured: ReviewOutput };
 
     await step.run("post-comment", async () => {
       await postInlineReview(token, owner, repo, prNumber, review.structured, review.output);

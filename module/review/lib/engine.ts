@@ -44,6 +44,7 @@ export type RunReviewInput = {
   title: string;
   description: string;
   repoId: string;
+  architectureProfile?: string | null;
   options?: {
     // For eval / offline runs where the repo isn't indexed in Pinecone.
     skipRetrieval?: boolean;
@@ -101,8 +102,14 @@ function formatContextBlock(chunks: RetrievedChunk[]): string {
 
 function buildPrompt(input: RunReviewInput, chunks: RetrievedChunk[]): string {
   const contextBlock = formatContextBlock(chunks);
-  return `You are an expert code reviewer. Analyze the following pull request and provide a detailed, constructive code review.
 
+  let profileSection = "";
+  if (input.architectureProfile) {
+    profileSection = `\n# Repository Architecture Profile\nThis repository has the following architectural conventions and stack. You MUST respect these conventions. Do not flag code as a "code smell" if it aligns with these conventions.\n${input.architectureProfile}\n`;
+  }
+
+  return `You are an expert code reviewer. Analyze the following pull request and provide a detailed, constructive code review.
+${profileSection}
 PR Title: ${input.title}
 PR Description: ${input.description || "No description provided"}
 
@@ -116,6 +123,8 @@ ${input.diff}
 
 Provide a comprehensive review using the provided JSON schema. Ensure all findings include specific file paths and line numbers that match the diff.`;
 }
+
+
 
 async function verifyFindings(
   input: RunReviewInput,

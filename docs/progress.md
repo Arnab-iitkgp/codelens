@@ -20,7 +20,7 @@
 | 0.3 — Inline PR comments | ✅ Done | Replaced `issues.createComment` with `pulls.createReview`. Added 422 error fallback to general comment. |
 | 0.4 — Adversarial verify pass | ✅ Done | Second LLM call inside `engine.ts` using `verifySchema` to refute findings. |
 | 0.5 — Existence checks | ✅ Done | Validate file and line number in PR's changed-files list using `parse-diff`. |
-| 0.6 — Repo profile stub | 🔴 Not started | Add `architectureProfile: String?` to Prisma. |
+| 0.6 — Repo profile stub | ✅ Done | Added `architectureProfile: String?` to Prisma and injected it into the engine prompt. |
 | 0.7 — Large PR chunking | 🔴 Not started | Split large diffs by file, review in parallel per-file-group, merge findings. Option B: walkthrough generated from structure scan while per-file reviews run in parallel. |
 
 ## Phase 0.5 — Eval Harness
@@ -36,8 +36,8 @@
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 1.2 — Repo profile generator | 🔴 Not started | Sample ~20 files, one `generateObject` call to produce stack/patterns profile. |
-| 1.3 — Inject profile into prompt | 🔴 Not started | Prepend profile as system context to every review. |
+| 1.2 — Repo profile generator | ✅ Done | Sample 20 files via GitHub Tree API, feed into `generateObject` with `profileSchema`, and save as markdown string to DB. |
+| 1.3 — Inject profile into prompt | ✅ Done | Included natively via `buildPrompt` in `engine.ts` during Phase 0.6. |
 
 ## Phase 3 — Code Intelligence (tree-sitter)
 

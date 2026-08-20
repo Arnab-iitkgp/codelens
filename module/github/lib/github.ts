@@ -309,3 +309,69 @@ export const postInlineReview = async (
     await postReviewComment(token, owner, repo, prNumber, fallbackMarkdown);
   }
 };
+
+export const getRepoSampleFiles = async (
+  token: string,
+  owner: string,
+  repo: string,
+  sampleSize: number = 20
+): Promise<{ path: string; content: string }[]> => {
+  const pMap = (await import("p-map")).default;
+  const octokit = new Octokit({ auth: token });
+
+  const { data: tree } = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: "HEAD",
+    recursive: "true",
+  });
+
+  let codeBlobs = tree.tree.filter((item) => {
+    if (item.type !== "blob" || !item.path || !item.sha) return false;
+    if (item.path.match(/\.(png|jpg|jpeg|gif|svg|pdf|gz|tar|ico|woff|woff2|ttf|eot|mp4|webm|zip)$/i)) return false;
+    if (item.path.match(/(^|\/)node_modules\//)) return false;
+    if (item.path.match(/package-lock\.json|bun\.lock|yarn\.lock$/)) return false;
+    return true;
+  });
+
+  // Heuristic sampling: Prioritize root config files, then src/app/lib files.
+  codeBlobs = codeBlobs.sort((a, b) => {
+    const aPath = a.path!;
+    const bPath = b.path!;
+    
+    const aScore = (aPath.includes("/") ? 0 : 50) + 
+      (aPath.match(/package\.json|schema\.prisma|dockerfile/i) ? 100 : 0) +
+      (aPath.match(/^(src|app|lib|module)\//) ? 20 : 0);
+      
+    const bScore = (bPath.includes("/") ? 0 : 50) + 
+      (bPath.match(/package\.json|schema\.prisma|dockerfile/i) ? 100 : 0) +
+      (bPath.match(/^(src|app|lib|module)\//) ? 20 : 0);
+      
+    return bScore - aScore; // Descending
+  });
+
+  const sampledBlobs = codeBlobs.slice(0, sampleSize);
+
+  const files = await pMap(
+    sampledBlobs,
+    async (blob) => {
+      try {
+        const { data } = await octokit.rest.git.getBlob({
+          owner,
+          repo,
+          file_sha: blob.sha!,
+        });
+        return {
+          path: blob.path!,
+          content: Buffer.from(data.content, "base64").toString("utf-8"),
+        };
+      } catch (error) {
+        console.error(`Failed to fetch blob: ${blob.path}`, error);
+        return null;
+      }
+    },
+    { concurrency: 5 }
+  );
+
+  return files.filter((f): f is { path: string; content: string } => f !== null);
+};

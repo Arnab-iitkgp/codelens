@@ -3,6 +3,7 @@ import { inngest } from "../../../inngest/client";
 import { indexRepo } from "../../../inngest/functions/index";
 import { generateReview } from "@/inngest/functions/review";
 import { generateDemoReview } from "@/inngest/functions/demo-review";
+import { generateProfile } from "@/inngest/functions/profile";
 // Create an API that serves zero functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -11,5 +12,6 @@ export const { GET, POST, PUT } = serve({
     indexRepo,
     generateReview,
     generateDemoReview,
+    generateProfile,
   ],
 });
