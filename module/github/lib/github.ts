@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/db"
 import { headers } from "next/headers"
-import { Octokit } from "octokit"
+import { Octokit } from "octokit";
+import { type ReviewOutput } from "@/module/review/lib/engine";
 
 
 
@@ -251,3 +252,60 @@ export const postReviewComment = async (
 
   })
 }
+
+export const postInlineReview = async (
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  reviewObj: ReviewOutput,
+  fallbackMarkdown: string
+) => {
+  const octokit = new Octokit({ auth: token });
+  
+  // 1. Format the top-level review body (Summary & Walkthrough)
+  let body = `## Automated Code Review\n\n`;
+  body += `**Summary:** ${reviewObj.summary}\n\n`;
+  body += `**Walkthrough:**\n${reviewObj.walkthrough}\n\n`;
+  if (reviewObj.sequenceDiagram) {
+    body += `**Flow:**\n\`\`\`mermaid\n${reviewObj.sequenceDiagram}\n\`\`\`\n\n`;
+  }
+  if (reviewObj.strengths?.length > 0) {
+    body += `**Strengths:**\n${reviewObj.strengths.map(s => `- ${s}`).join("\n")}\n\n`;
+  }
+  body += `*This review was generated automatically by CodeLens.*`;
+
+  // 2. Format the inline comments mapping structured JSON to GitHub's schema
+  const comments = reviewObj.findings.map(finding => {
+    const emoji = finding.severity === "critical" ? "🚨" : finding.severity === "warning" ? "⚠️" : "💡";
+    let commentBody = `### ${emoji} [${finding.category}] ${finding.severity.toUpperCase()}\n`;
+    commentBody += `**Issue:** ${finding.claim}\n\n`;
+    commentBody += `**Evidence:** ${finding.evidence}\n\n`;
+    commentBody += `**Suggestion:** ${finding.suggestion}`;
+    
+    return {
+      path: finding.file,
+      line: finding.startLine, // GitHub API needs exactly 'line' for a single-line comment
+      body: commentBody
+    };
+  });
+
+  // 3. Attempt to post the inline review
+  try {
+    await octokit.rest.pulls.createReview({
+      owner,
+      repo,
+      pull_number: prNumber,
+      event: "COMMENT", 
+      body,
+      comments
+    });
+    console.log(`[github] Successfully posted inline review to PR #${prNumber}`);
+  } catch (error: unknown) {
+    // 4. THE TRAP: If the AI hallucinated a line number, GitHub throws a 422.
+    // We catch it and fall back to the old way so the review isn't lost.
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`[github] Failed to post inline review (likely a 422 line number mismatch). Falling back to general comment. Error: ${errorMessage}`);
+    await postReviewComment(token, owner, repo, prNumber, fallbackMarkdown);
+  }
+};

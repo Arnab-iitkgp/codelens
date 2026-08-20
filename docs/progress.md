@@ -16,10 +16,10 @@
 | Task | Status | Notes |
 | ---- | ------ | ----- |
 | 0.1 — Diff-based retrieval | ✅ Done | `retrieveContextForDiff()` in `rag.ts` |
-| 0.2 — Structured JSON findings | 🔴 Not started | Switch `engine.ts` to `generateObject` + Zod. Schema: `{ file, startLine, endLine, severity, category, claim, evidence, suggestion }[]` |
-| 0.3 — Inline PR comments | 🔴 Not started | Blocked by 0.2. Change `postReviewComment` to `pulls.createReview` with `comments[]`. |
-| 0.4 — Adversarial verify pass | 🔴 Not started | Second LLM call to refute each finding. |
-| 0.5 — Existence checks | 🔴 Not started | Validate file/line in PR's changed-files list. |
+| 0.2 — Structured JSON findings | ✅ Done | Switched `engine.ts` to `generateObjectWithFallback` + Zod schema. Returns both structured data and fallback markdown string. |
+| 0.3 — Inline PR comments | ✅ Done | Replaced `issues.createComment` with `pulls.createReview`. Added 422 error fallback to general comment. |
+| 0.4 — Adversarial verify pass | ✅ Done | Second LLM call inside `engine.ts` using `verifySchema` to refute findings. |
+| 0.5 — Existence checks | ✅ Done | Validate file and line number in PR's changed-files list using `parse-diff`. |
 | 0.6 — Repo profile stub | 🔴 Not started | Add `architectureProfile: String?` to Prisma. |
 | 0.7 — Large PR chunking | 🔴 Not started | Split large diffs by file, review in parallel per-file-group, merge findings. Option B: walkthrough generated from structure scan while per-file reviews run in parallel. |
 
@@ -28,7 +28,7 @@
 | Task | Status | Notes |
 | ---- | ------ | ----- |
 | Runner + Judge | ✅ Done | `eval/run.ts`, `eval/judge.ts` |
-| Test cases | 🟡 In progress | Have Django, FastAPI, Kubernetes PR list in `testPrs.md`. `case-11-tough-cookie-proto-pollution` exists. Need 8-10 total. |
+| Test cases | ✅ Done | Initial set of 12 synthetic/curated cases implemented. Real-world PRs (Django, FastAPI) deferred to later phases. |
 | Baseline run | 🔴 Not started | Run across 4 models, document day-zero numbers |
 | Control set (FP rate) | 🔴 Not started | 3-5 clean PRs |
 

@@ -48,7 +48,8 @@ export function getEmbeddingModel() {
 }
 
 //Circuit Breaker / Fallback Generation
-import { generateText as aiGenerateText } from "ai";
+import { generateText as aiGenerateText, generateObject as aiGenerateObject } from "ai";
+import { z } from "zod";
 
 export async function generateTextWithFallback(prompt: string) {
   const primaryProvider = (process.env.AI_PROVIDER as AIProvider) || DEFAULT_PROVIDER;
@@ -91,4 +92,48 @@ export async function generateTextWithFallback(prompt: string) {
   }
 
   throw new Error(`[AI Circuit Breaker] ALL underlying AI providers failed. Last Error: ${lastError}`);
+}
+
+export async function generateObjectWithFallback<T>(prompt: string, schema: z.ZodSchema<T>) {
+  const primaryProvider = (process.env.AI_PROVIDER as AIProvider) || DEFAULT_PROVIDER;
+
+  // Seq of fallbacks to try in order
+  const fallbackOrder: AIProvider[] = [primaryProvider];
+  if (primaryProvider !== "google") fallbackOrder.push("google");
+  if (primaryProvider !== "groq") fallbackOrder.push("groq");
+  if (primaryProvider !== "openai") fallbackOrder.push("openai");
+
+  let lastError = null;
+
+  for (const provider of fallbackOrder) {
+    try {
+      let model;
+      if (provider === "google") {
+        model = google(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+      } else if (provider === "groq") {
+        model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
+      } else if (provider === "openai") {
+        model = openai(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gpt-4o-mini");
+      }
+
+      if (!model) throw new Error("No model mapped for provider");
+
+      const response = await aiGenerateObject({
+        model,
+        prompt,
+        schema,
+      });
+
+      if (provider !== primaryProvider) {
+        console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed for object generation. Successfully rerouted to '${provider}' with zero downtime.`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error(`[AI Provider Failed] Attempted ${provider} for object generation, failed with:`, error);
+      lastError = error;
+    }
+  }
+
+  throw new Error(`[AI Circuit Breaker] ALL underlying AI providers failed for object generation. Last Error: ${lastError}`);
 }

@@ -10,11 +10,14 @@ function timestamp() {
 }
 
 async function main() {
-  const cases = loadAllCases();
+  let cases = loadAllCases();
   if (cases.length === 0) {
     console.error("No cases found in eval/cases/. Add one and try again.");
     process.exit(1);
   }
+  
+  // Limit to 5 PRs to avoid blowing up free-tier LLM API quotas
+  cases = cases.slice(0, 5);
 
   const provider = process.env.AI_PROVIDER ?? "google";
   const runDir = path.join(
@@ -60,6 +63,9 @@ async function main() {
       console.log(`✗ failed`);
       console.error(`   ${(err as Error)?.message ?? err}`);
     }
+    
+    // Add a 12-second delay to avoid blowing past Groq's 8,000 TPM limit
+    await new Promise((resolve) => setTimeout(resolve, 12000));
   }
 
   writeFileSync(

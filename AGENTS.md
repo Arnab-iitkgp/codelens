@@ -111,6 +111,12 @@ is incomplete. See `docs/progress.md` for current phase.
 Don't delete existing comments, docstrings, or documentation unless they are
 factually wrong due to your code change.
 
+### 8. No Deprecated Functions
+Never use deprecated functions, APIs, or libraries. If your IDE flags a function as deprecated, find the modern replacement in the official docs before committing code.
+
+### 9. Track Eval History
+After running \`bun eval:judge\`, you MUST record the new precision/recall/efficiency metrics in \`docs/eval-history.md\`. We need a running ledger of how every change impacts the pipeline's intelligence.
+
 ---
 
 ## Commands

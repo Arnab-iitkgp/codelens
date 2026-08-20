@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import {
   getPullRequestDiff,
   postReviewComment,
+  postInlineReview
 } from "@/module/github/lib/github";
 import { runReview } from "@/module/review/lib/engine";
 
@@ -53,7 +54,7 @@ export const generateReview = inngest.createFunction(
     // separate step.run() blocks — merged into one for eval parity. If
     // per-substep durability becomes valuable later, split back out.
     const review = await step.run("run-review-engine", async () => {
-      const { output, latencyMs, meta } = await runReview({
+      const { output, structured, latencyMs, meta } = await runReview({
         diff,
         title,
         description,
@@ -62,11 +63,11 @@ export const generateReview = inngest.createFunction(
       console.log(
         `[review] engine done: ${latencyMs}ms, retrieval=${meta.retrievalMode}, chunks=${meta.chunkCount}, provider=${meta.provider}`
       );
-      return output;
+      return { output, structured };
     });
 
-    await step.run("post -comment", async () => {
-      await postReviewComment(token, owner, repo, prNumber, review);
+    await step.run("post-comment", async () => {
+      await postInlineReview(token, owner, repo, prNumber, review.structured, review.output);
     });
 
     //store review in db
@@ -89,7 +90,7 @@ export const generateReview = inngest.createFunction(
             prNumber,
             prTitle: title,
             prurl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
-            review,
+            review: review.output,
             status: "completed",
           },
         });
