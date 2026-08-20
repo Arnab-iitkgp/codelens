@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/services/payments.ts",
+      "line": 17,
+      "kind": "bug",
+      "description": "Catch block is empty — Stripe errors (rate limits, card declines, network failures, misconfiguration) are silently swallowed and the endpoint returns { ok: true } even when no charge occurred. This is a payments correctness bug: callers cannot distinguish a successful charge from a failed one. At minimum log the error; ideally propagate it or return a distinct failure state so callers can react. Silencing errors is not the same as handling them."
+    }
+  ]
+}

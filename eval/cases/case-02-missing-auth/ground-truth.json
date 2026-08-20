@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "file": "src/pages/api/admin/delete-user.ts",
+      "line": 4,
+      "kind": "security",
+      "description": "The handler performs a destructive database action (deleting a user) with no authentication or authorization check. Any unauthenticated caller can delete any user by posting a userId. This route must be protected — at minimum verify the session, and given it lives under /admin/, verify the caller has an admin role before executing the delete."
+    },
+    {
+      "file": "src/pages/api/admin/delete-user.ts",
+      "line": 14,
+      "kind": "bug",
+      "description": "userId is used directly without validation. It should be validated as a well-formed identifier (e.g. UUID) before being passed to db.user.delete; otherwise malformed input can cause Prisma to throw an unhelpful error and leak internals to the client."
+    }
+  ]
+}

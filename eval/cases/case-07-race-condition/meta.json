@@ -1,0 +1,6 @@
+{
+  "title": "refactor: replace raw SQL with Prisma for withdrawal",
+  "description": "Replace the raw SQL executeRaw call in the withdrawal endpoint with idiomatic Prisma. Same behavior, easier to maintain.",
+  "source": "synthetic",
+  "notes": "The 'refactor' silently breaks atomicity. The old raw SQL was a single atomic UPDATE with the balance check in the WHERE clause. The new code does a findUnique, then a JS-level check, then an update — a classic check-then-act (TOCTOU) race. Two concurrent withdrawals for a user with $100 can both see balance=100, both pass the check, both subtract, and drive the account below zero. One expected finding."
+}

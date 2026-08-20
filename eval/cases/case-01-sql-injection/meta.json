@@ -1,0 +1,6 @@
+{
+  "title": "refactor: inline the user id in the lookup query",
+  "description": "Simple readability change to the user lookup query. Small refactor, no functional changes intended.",
+  "source": "synthetic",
+  "notes": "Deliberately introduces a SQL injection by replacing a parameterized query with string interpolation, plus adds a console.log that leaks user identifiers. Two expected findings."
+}

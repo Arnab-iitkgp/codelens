@@ -1,0 +1,6 @@
+{
+  "title": "feat: add uploaded-file download endpoint",
+  "description": "Users need to download files they've uploaded. Added a simple endpoint that reads from the uploads directory and streams the file back.",
+  "source": "synthetic",
+  "notes": "The endpoint uses req.query.name directly in path.join to construct a file path, with no validation that the resulting path stays inside UPLOADS_DIR. An attacker can pass `?name=../../../../etc/passwd` and read arbitrary files. path.join preserves `..` segments — it does not sandbox to the first argument. Classic path traversal. One expected finding."
+}

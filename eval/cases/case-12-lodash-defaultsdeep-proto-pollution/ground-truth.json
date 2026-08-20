@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "lodash.defaultsdeep/index.js",
+      "line": 1149,
+      "kind": "security",
+      "description": "The removed safeGet helper was not dead code — its explicit purpose (as its jsdoc stated) was to return undefined when `key` is `__proto__` or `constructor`, blocking prototype pollution during deep merge. Replacing safeGet(object, key) with direct `object[key]` access reintroduces exactly the prototype-pollution vulnerability that this helper was added to fix in the upstream defaultsDeep PR. An attacker who can supply the `source` object (typical if defaults are merged from user-controlled JSON) can set `{ __proto__: { isAdmin: true } }` and pollute Object.prototype globally. Restore safeGet and its usages in baseMergeDeep."
+    }
+  ]
+}

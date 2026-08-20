@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/services/charge.ts",
+      "line": 15,
+      "kind": "bug",
+      "description": "The retry loop calls stripe.charges.create with no idempotency key. If the first attempt succeeds on Stripe's side but the response is lost (client-side timeout, TCP reset, transient DNS failure), the retry creates a *second* charge — the customer is charged twice for the same operation. This is a well-known payments footgun and the exact reason Stripe's SDK exposes an idempotencyKey option: passing the same key on retry causes Stripe to return the original result instead of creating a new charge. Fix by threading a stable idempotency key (e.g. tied to an order id or a per-attempt-set UUID generated *before* the loop) into stripe.charges.create's second argument: `stripe.charges.create({...}, { idempotencyKey })`. Additionally: the catch is intentionally broad and will retry on non-retryable errors like card_declined — narrow the retry to transient error codes."
+    }
+  ]
+}

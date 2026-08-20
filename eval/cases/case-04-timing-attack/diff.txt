@@ -1,0 +1,16 @@
+diff --git a/src/auth/verify-token.ts b/src/auth/verify-token.ts
+index 333cccc..444dddd 100644
+--- a/src/auth/verify-token.ts
++++ b/src/auth/verify-token.ts
+@@ -1,10 +1,7 @@
+-import crypto from "node:crypto";
+-
+ export function verifyApiToken(provided: string, expected: string): boolean {
+   if (provided.length !== expected.length) return false;
+-  return crypto.timingSafeEqual(
+-    Buffer.from(provided),
+-    Buffer.from(expected)
+-  );
++  // Direct comparison — simpler, same effect.
++  return provided === expected;
+ }

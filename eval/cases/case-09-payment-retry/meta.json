@@ -1,0 +1,6 @@
+{
+  "title": "feat: add retry with backoff to payment charge",
+  "description": "The charge endpoint was fragile — transient Stripe / network errors would fail user requests. Added retry with backoff so we recover from transient failures.",
+  "source": "synthetic",
+  "notes": "Adds a retry loop around stripe.charges.create with no idempotency key. If a charge request succeeds server-side but the network drops on the response, the retry issues a second create and Stripe processes it as a new charge — customer is charged twice. The Stripe SDK supports an idempotencyKey option specifically to prevent this; retrying without it is a well-known payments footgun. One expected finding."
+}

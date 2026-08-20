@@ -1,0 +1,6 @@
+{
+  "title": "refactor: simplify api token verification",
+  "description": "The crypto.timingSafeEqual usage was hard to read and required Buffer conversions. Replaced with a direct === comparison — same result, cleaner code.",
+  "source": "synthetic",
+  "notes": "Replaces a constant-time comparison with ===, which returns early on the first mismatched character and leaks timing information about the secret. Classic timing-attack vulnerability. One expected finding."
+}

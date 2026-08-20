@@ -1,0 +1,6 @@
+{
+  "title": "perf: skip await on order.save() to avoid blocking",
+  "description": "Small perf tweak — order creation returned the id before persistence completed anyway, so awaiting save() is unnecessary overhead. Makes the endpoint faster.",
+  "source": "synthetic",
+  "notes": "Removes the await on order.save(). Bug: order.id may not be populated (depending on ORM behavior), any DB error becomes an unhandled promise rejection, and callers assume the order is persisted when it isn't. One expected finding."
+}

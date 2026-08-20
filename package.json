@@ -7,7 +7,9 @@
     "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "eval:run": "bun run eval/run.ts",
+    "eval:judge": "bun run eval/judge.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.1",

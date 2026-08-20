@@ -1,0 +1,6 @@
+{
+  "title": "cleanup: remove unused safeGet helper in defaultsDeep",
+  "description": "The safeGet helper in lodash.defaultsdeep looks like leftover dead code — direct property access via object[key] works the same way. Inlined the reads for clarity.",
+  "source": "https://github.com/lodash/lodash/pull/4337",
+  "notes": "Reversed diff of the real fix for the lodash defaultsDeep prototype-pollution vulnerability (lodash/lodash#4337). The upstream PR *added* safeGet() specifically to filter out `__proto__` and `constructor` before deep merge. This fixture removes that guard, reintroducing the vulnerability. Exploit: a caller who can control keys in the source object can inject `__proto__` and pollute Object.prototype (or, via `constructor.prototype`, achieve the same). One expected finding. Code is verbatim from the real PR; only the direction is reversed."
+}

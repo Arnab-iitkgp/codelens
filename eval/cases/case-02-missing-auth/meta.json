@@ -1,0 +1,6 @@
+{
+  "title": "feat: add admin delete-user endpoint",
+  "description": "New admin-only endpoint under /api/admin for deleting users by id. Wired for the admin dashboard team's cleanup workflow.",
+  "source": "synthetic",
+  "notes": "Introduces a new admin route with no authentication or role check whatsoever — any unauthenticated caller can delete any user. All other admin routes in this repo wrap the handler in withAuth({ role: 'admin' }). One expected finding."
+}

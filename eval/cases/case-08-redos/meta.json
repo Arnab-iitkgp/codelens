@@ -1,0 +1,6 @@
+{
+  "title": "feat: add server-side email validation",
+  "description": "Add a small regex-based email validator so the signup endpoint rejects obviously bad input before hitting the DB.",
+  "source": "synthetic",
+  "notes": "The regex uses a nested quantifier `([a-z0-9]+)+` which triggers catastrophic backtracking on adversarial inputs like `aaaaaaaaaaaaaaaaaaaaaaaaaaaa!`. An attacker can peg the event loop for seconds per request. Classic ReDoS. One expected finding."
+}

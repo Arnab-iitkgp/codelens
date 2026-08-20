@@ -1,0 +1,30 @@
+diff --git a/src/services/charge.ts b/src/services/charge.ts
+index eee5555..fff6666 100644
+--- a/src/services/charge.ts
++++ b/src/services/charge.ts
+@@ -1,7 +1,20 @@
+ import { stripe } from "@/lib/stripe";
+
++const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
++
+ export async function chargeCustomer(customerId: string, amountCents: number) {
+-  return await stripe.charges.create({
+-    customer: customerId,
+-    amount: amountCents,
+-    currency: "usd",
+-  });
++  let lastErr: unknown;
++  for (let attempt = 0; attempt < 3; attempt++) {
++    try {
++      return await stripe.charges.create({
++        customer: customerId,
++        amount: amountCents,
++        currency: "usd",
++      });
++    } catch (err) {
++      lastErr = err;
++      await sleep(500 * (attempt + 1));
++    }
++  }
++  throw lastErr;
+ }

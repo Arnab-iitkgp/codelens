@@ -1,0 +1,22 @@
+diff --git a/src/services/wallet.ts b/src/services/wallet.ts
+index aaa1111..bbb2222 100644
+--- a/src/services/wallet.ts
++++ b/src/services/wallet.ts
+@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
+ export async function withdraw(userId: string, amount: number) {
+   if (amount <= 0) throw new Error("amount must be positive");
+
+-  const rows = await db.$executeRaw`
+-    UPDATE accounts SET balance = balance - ${amount}
+-    WHERE user_id = ${userId} AND balance >= ${amount}
+-  `;
+-  if (rows === 0) throw new Error("insufficient funds");
++  const account = await db.account.findUnique({ where: { userId } });
++  if (!account) throw new Error("account not found");
++  if (account.balance < amount) throw new Error("insufficient funds");
++  await db.account.update({
++    where: { userId },
++    data: { balance: account.balance - amount },
++  });
+   return { ok: true };
+ }

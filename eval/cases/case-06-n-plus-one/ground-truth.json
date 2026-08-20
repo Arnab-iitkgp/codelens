@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/services/orders-report.ts",
+      "line": 6,
+      "kind": "perf",
+      "description": "Classic N+1 query pattern. The previous implementation fetched all orders in one findMany with `id: { in: orderIds }`, one round trip. The new loop issues one findUnique per id — for 100 orders that is 100 sequential DB round trips instead of 1. Latency scales linearly with input. Restore the batched findMany; if per-order transforms are needed, apply them in memory after the batch fetch."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/services/orders.ts",
+      "line": 13,
+      "kind": "bug",
+      "description": "order.save() returns a Promise that is no longer awaited. Any failure (DB down, constraint violation, network error) becomes an unhandled promise rejection with no way to surface it to the caller. The endpoint returns { orderId, status: 'pending' } even when persistence failed. Callers will believe the order exists when it does not. The perf gain is illusory — save() must complete before the caller can trust the response."
+    }
+  ]
+}

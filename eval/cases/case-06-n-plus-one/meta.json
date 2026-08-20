@@ -1,0 +1,6 @@
+{
+  "title": "refactor: fetch orders one at a time for clarity",
+  "description": "Split the batch findMany into a per-id loop. Easier to reason about, easier to add per-order transforms later.",
+  "source": "synthetic",
+  "notes": "Replaces a single batched findMany with a per-id loop, turning one DB query into N. Classic N+1 pattern. One expected finding."
+}

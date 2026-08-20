@@ -1,0 +1,12 @@
+diff --git a/src/lib/validators.ts b/src/lib/validators.ts
+index ccc3333..ddd4444 100644
+--- a/src/lib/validators.ts
++++ b/src/lib/validators.ts
+@@ -1,3 +1,7 @@
+ export function isNonEmpty(s: unknown): s is string {
+   return typeof s === "string" && s.length > 0;
+ }
++
++export function isValidEmail(email: string): boolean {
++  return /^([a-z0-9]+)+@([a-z0-9]+\.)+[a-z]+$/i.test(email);
++}

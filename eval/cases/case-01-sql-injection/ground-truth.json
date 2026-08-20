@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "file": "src/db/users.ts",
+      "line": 5,
+      "kind": "security",
+      "description": "SQL injection: user-controlled `id` is interpolated directly into a SQL string instead of being parameterized. The parameterized `?` placeholder was removed. This is exploitable — any caller passing untrusted input can escape the string context."
+    },
+    {
+      "file": "src/db/users.ts",
+      "line": 4,
+      "kind": "smell",
+      "description": "console.log leaks user identifiers to logs. Either remove the log entirely or use structured logging with PII redaction."
+    }
+  ]
+}

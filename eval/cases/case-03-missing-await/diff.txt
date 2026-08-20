@@ -1,0 +1,13 @@
+diff --git a/src/services/orders.ts b/src/services/orders.ts
+index 111aaaa..222bbbb 100644
+--- a/src/services/orders.ts
++++ b/src/services/orders.ts
+@@ -10,8 +10,9 @@ export async function createOrder(userId: string, items: Item[]) {
+     status: "pending",
+     createdAt: new Date(),
+   });
+-  await order.save();
++  order.save();
++  // returning immediately — save happens in the background
+   return { orderId: order.id, status: order.status };
+ }

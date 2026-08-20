@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "lib/memstore.js",
+      "line": 42,
+      "kind": "security",
+      "description": "Prototype pollution vulnerability. The cookie store uses attacker-controlled values (cookie domain, path) as keys into `this.idx`. When those keys are plain `{}` objects, they inherit from Object.prototype, so writing to `this.idx['__proto__']` (which is exactly what happens when a cookie with `Domain=__proto__` is stored) mutates Object.prototype and pollutes every object in the process. This is the exact vulnerability class fixed as CVE-2023-26136 in tough-cookie by initializing these maps with `Object.create(null)` — a null-prototype object cannot be walked into via `__proto__`. Restore `Object.create(null)` at all four sites. Do not use plain object literals for maps whose keys are derived from untrusted input."
+    }
+  ]
+}

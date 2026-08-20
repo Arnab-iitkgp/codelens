@@ -43,3 +43,6 @@ next-env.d.ts
 /lib/generated/prisma
 
 *PLAN.md
+
+# eval run outputs — one directory per run, potentially large
+/eval/results/

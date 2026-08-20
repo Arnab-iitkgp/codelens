@@ -1,0 +1,35 @@
+diff --git a/lib/memstore.js b/lib/memstore.js
+index f313bbf9..001ca930 100644
+--- a/lib/memstore.js
++++ b/lib/memstore.js
+@@ -39,7 +39,7 @@ class MemoryCookieStore extends Store {
+   constructor() {
+     super();
+     this.synchronous = true;
+-    this.idx = Object.create(null);
++    this.idx = {};
+     const customInspectSymbol = getCustomInspectSymbol();
+     if (customInspectSymbol) {
+       this[customInspectSymbol] = this.inspect;
+@@ -111,10 +111,10 @@ class MemoryCookieStore extends Store {
+
+   putCookie(cookie, cb) {
+     if (!this.idx[cookie.domain]) {
+-      this.idx[cookie.domain] = Object.create(null);
++      this.idx[cookie.domain] = {};
+     }
+     if (!this.idx[cookie.domain][cookie.path]) {
+-      this.idx[cookie.domain][cookie.path] = Object.create(null);
++      this.idx[cookie.domain][cookie.path] = {};
+     }
+     this.idx[cookie.domain][cookie.path][cookie.key] = cookie;
+     cb(null);
+@@ -146,7 +146,7 @@ class MemoryCookieStore extends Store {
+     return cb(null);
+   }
+   removeAllCookies(cb) {
+-    this.idx = Object.create(null);
++    this.idx = {};
+     return cb(null);
+   }
+   getAllCookies(cb) {

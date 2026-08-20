@@ -1,0 +1,6 @@
+{
+  "title": "fix: don't crash on stripe errors",
+  "description": "Charge endpoint was returning 500 when Stripe was down. Wrapped the charge in try/catch so the endpoint returns cleanly.",
+  "source": "synthetic",
+  "notes": "Wraps stripe.charges.create in try/catch but does nothing in the catch — errors are silently swallowed and the endpoint always returns { ok: true }, so callers can't tell whether the charge actually happened. One expected finding."
+}

@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/services/wallet.ts",
+      "line": 10,
+      "kind": "bug",
+      "description": "Check-then-act race condition (TOCTOU). The old raw SQL performed the balance check and decrement atomically in a single UPDATE. The new code reads the balance in one statement, checks it in JS, and writes back in a second statement. Two concurrent withdrawals for the same user can both read balance=100, both pass the >= amount check, and both apply the subtraction — driving the balance negative. The refactor is not equivalent to the original; it silently drops atomicity. Fix by using an atomic update, e.g. Prisma's `decrement` inside an update with a where clause that includes the balance guard, or a transaction with SELECT FOR UPDATE, or by keeping the original conditional UPDATE."
+    }
+  ]
+}

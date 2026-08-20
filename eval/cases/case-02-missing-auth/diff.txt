@@ -1,0 +1,23 @@
+diff --git a/src/pages/api/admin/delete-user.ts b/src/pages/api/admin/delete-user.ts
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/src/pages/api/admin/delete-user.ts
+@@ -0,0 +1,17 @@
++import type { NextApiRequest, NextApiResponse } from "next";
++import { db } from "@/lib/db";
++
++export default async function handler(
++  req: NextApiRequest,
++  res: NextApiResponse
++) {
++  if (req.method !== "POST") {
++    return res.status(405).json({ error: "Method not allowed" });
++  }
++  const { userId } = req.body ?? {};
++  if (!userId) {
++    return res.status(400).json({ error: "Missing userId" });
++  }
++  await db.user.delete({ where: { id: userId } });
++  return res.status(200).json({ ok: true });
++}

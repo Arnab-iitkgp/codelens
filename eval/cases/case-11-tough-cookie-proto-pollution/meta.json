@@ -1,0 +1,6 @@
+{
+  "title": "refactor: use plain object literals in memstore",
+  "description": "The MemoryCookieStore uses Object.create(null) to initialize its internal maps. Replaced with plain {} literals — same behavior, more idiomatic and consistent with the rest of the codebase.",
+  "source": "https://github.com/salesforce/tough-cookie/pull/283",
+  "notes": "Reversed diff of the real fix for CVE-2023-26136 (salesforce/tough-cookie#283). The upstream PR replaced `this.idx = {}` with `this.idx = Object.create(null)` at four sites to prevent prototype pollution when a cookie is set with Domain=__proto__. This fixture reintroduces the vulnerability. Exploit: a request that stores a cookie with `Domain=__proto__` writes into Object.prototype (because `this.idx.__proto__` resolves to it), polluting every object in the process. One expected finding. Code is verbatim from the real PR; only the direction is reversed."
+}

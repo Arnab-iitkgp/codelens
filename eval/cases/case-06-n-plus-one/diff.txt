@@ -1,0 +1,21 @@
+diff --git a/src/services/orders-report.ts b/src/services/orders-report.ts
+index 777aaaa..888bbbb 100644
+--- a/src/services/orders-report.ts
++++ b/src/services/orders-report.ts
+@@ -3,10 +3,11 @@ import { db } from "@/lib/db";
+ export async function getOrdersWithUsers(orderIds: string[]) {
+-  const orders = await db.order.findMany({
+-    where: { id: { in: orderIds } },
+-    include: { user: true },
+-  });
+-  return orders;
++  const orders = [];
++  for (const id of orderIds) {
++    const order = await db.order.findUnique({
++      where: { id },
++      include: { user: true },
++    });
++    if (order) orders.push(order);
++  }
++  return orders;
+ }

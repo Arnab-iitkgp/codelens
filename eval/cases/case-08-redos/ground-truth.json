@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/lib/validators.ts",
+      "line": 6,
+      "kind": "security",
+      "description": "The regex `/^([a-z0-9]+)+@([a-z0-9]+\\.)+[a-z]+$/i` contains a nested quantifier `([a-z0-9]+)+` that is vulnerable to catastrophic backtracking (ReDoS). On adversarial input such as a long run of `a`s followed by a non-matching character (e.g. `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!`), the regex engine explores exponentially many match combinations and pegs the event loop for seconds or longer per request — a denial-of-service vector on any endpoint that calls this validator on untrusted input. Remove the nested quantifier, use a linear-safe regex (e.g. `/^[a-z0-9]+@[a-z0-9.]+\\.[a-z]+$/i`), a dedicated email library, or safe-regex tooling to gate future additions."
+    }
+  ]
+}

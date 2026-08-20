@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "file": "src/pages/api/files/download.ts",
+      "line": 16,
+      "kind": "security",
+      "description": "Path traversal vulnerability. `path.join(UPLOADS_DIR, name)` does not sandbox the result to UPLOADS_DIR — it preserves `..` segments. A request like `?name=../../../../etc/passwd` yields a filePath that escapes the uploads directory and lets the attacker read arbitrary files the Node process can read (config, private keys, /etc/passwd, other users' uploads). Fix: after joining, call `path.resolve(filePath)` and verify the result starts with UPLOADS_DIR + path.sep (or equivalent), rejecting the request otherwise. Ideally also whitelist the filename with a strict regex (e.g. `/^[a-zA-Z0-9._-]+$/`)."
+    },
+    {
+      "file": "src/pages/api/files/download.ts",
+      "line": 18,
+      "kind": "security",
+      "description": "The user-controlled `name` is interpolated into the Content-Disposition header without escaping. This is a header/response-splitting risk (CR/LF in name lets an attacker inject additional headers) and, depending on how downstream clients handle it, may enable filename spoofing. Sanitize `name` before echoing it into any header (strip control chars, quote-encode)."
+    }
+  ]
+}

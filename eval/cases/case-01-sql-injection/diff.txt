@@ -1,0 +1,13 @@
+diff --git a/src/db/users.ts b/src/db/users.ts
+index abc1234..def5678 100644
+--- a/src/db/users.ts
++++ b/src/db/users.ts
+@@ -1,7 +1,8 @@
+ import { db } from "./client";
+
+ export async function getUserById(id: string) {
+-  const [row] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
++  console.log("lookup for user id:", id);
++  const [row] = await db.query(`SELECT * FROM users WHERE id = '${id}'`);
+   return row;
+ }

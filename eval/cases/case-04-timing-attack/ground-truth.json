@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "file": "src/auth/verify-token.ts",
+      "line": 6,
+      "kind": "security",
+      "description": "Replacing crypto.timingSafeEqual with === introduces a timing side-channel. === returns early on the first differing character, so response time correlates with how many leading characters of the token an attacker guessed correctly. Over many probes an attacker can recover the token byte-by-byte. Restore crypto.timingSafeEqual (with the length pre-check kept for safety, since timingSafeEqual throws on length mismatch)."
+    }
+  ]
+}
