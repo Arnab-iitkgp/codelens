@@ -75,6 +75,51 @@ export async function indexCodebase(
   console.log("indexing completed for repo:" + repoId);
 }
 
+export async function indexGraphSymbols(
+  repoId: string,
+  symbols: { id: string; path: string; qualifiedName: string; kind: string; codeBody: string }[]
+) {
+  const pMap = (await import("p-map")).default;
+  const vectors = await pMap(
+    symbols,
+    async (sym) => {
+      // Create a rich context string for the symbol
+      const content = `Symbol: ${sym.qualifiedName}\nPath: ${sym.path}\nKind: ${sym.kind}\n\n${sym.codeBody}`;
+      const truncatedContent = content.slice(0, 8000);
+      try {
+        const embedding = await generateEmbedding(truncatedContent);
+        return {
+          id: `symbol-${sym.id}`,
+          values: embedding,
+          metadata: {
+            type: "symbol",
+            symbolId: sym.id,
+            repoId,
+            path: sym.path,
+            kind: sym.kind,
+            content: truncatedContent,
+          },
+        };
+      } catch (error) {
+        console.error(`Failed to generate embedding for symbol:${sym.qualifiedName}, error: ${error}`);
+        return null;
+      }
+    },
+    { concurrency: 5 }
+  );
+
+  const validVectors = vectors.filter(Boolean) as any[];
+
+  if (validVectors.length > 0) {
+    const batchSize = 100;
+    for (let i = 0; i < validVectors.length; i += batchSize) {
+      const chunk = validVectors.slice(i, i + batchSize);
+      await pineconeIndex.upsert(chunk);
+    }
+  }
+  console.log(`[INDEXING] Embedded ${validVectors.length} symbols for repo: ${repoId}`);
+}
+
 export async function retrieveContext(query: string,repoId:string, topK:number=5) {
     const queryEmbedding = await generateEmbedding(query);
     const result = await pineconeIndex.query({

@@ -46,6 +46,12 @@
 > D-014 (tiered review modes for rate limits).
 > Inspired by Graphify and `graphrag.md` vision document.
 
+### Future Improvements & Backlog
+
+| Task | Status | Notes |
+| ---- | ------ | ----- |
+| F.1 — Token limit mitigation | 🔴 Not started | Address `max completion tokens reached` Groq API limit (chunking diffs, switching default models, or streaming). |
+
 ### 3A — Database & Schema
 
 | Task | Status | Notes |
@@ -75,18 +81,19 @@
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 3D.1 — Language router in indexer | 🔴 Not started | Update `inngest/functions/index.ts` — route `.ts/.js/.py` to graph path, all others to existing chunk path. |
-| 3D.2 — Graph indexing path | 🔴 Not started | Parse → extract → resolve → upsert Symbols + Edges to Prisma. |
-| 3D.3 — Per-symbol embeddings | 🔴 Not started | Embed each Symbol's `codeBody` → Pinecone with metadata `{ type: 'symbol', symbolId, repoId, kind }`. |
-| 3D.4 — Chunk fallback path | 🔴 Not started | Existing 500-token chunking for unsupported languages, with metadata `{ type: 'chunk' }`. |
+| 3D.1 — Language router in indexer | ✅ Done | Update `inngest/functions/index.ts` — route `.ts/.js/.py` to graph path, all others to existing chunk path. |
+| 3D.2 — Graph indexing path | ✅ Done | Parse → extract → resolve → upsert Symbols + Edges to Prisma. |
+| 3D.3 — Per-symbol embeddings | ✅ Done | Embed each Symbol's `codeBody` → Pinecone with metadata `{ type: 'symbol', symbolId, repoId, kind }`. |
+| 3D.4 — Chunk fallback path | ✅ Done | Existing 500-token chunking for unsupported languages, with metadata `{ type: 'chunk' }`. |
 
 ### 3E — Review Engine Upgrade
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 3E.1 — Graph query functions | 🔴 Not started | `module/ast/lib/graph.ts` — `getCallers()`, `getCallees()`, `getSymbolByName()`, `getSymbolsInRange()`. Pure SQL, zero LLM cost. |
-| 3E.2 — Deterministic investigator | 🔴 Not started | Replace `retrieve()` in `engine.ts`. Parse diff → find modified symbols → getCallers/getCallees → vector search → rank by impact table → assemble evidence. Works on ALL models. (D-011) |
-| 3E.3 — ReAct agent loop (optional) | 🔴 Not started | `module/review/lib/investigator.ts`. Runs only in `full` review mode. LLM reasons about evidence gaps and calls graph tools for more context. Max 3 iterations. (D-011, D-014) |
+| 3E.1 — Diff parsing | ✅ Done | `module/review/lib/investigator.ts` parses PR diff into added/modified symbols. |
+| 3E.2 — Deterministic context gathering | ✅ Done | For each modified symbol, query Prisma for `getCallees` and `getCallers` (SQL path). |
+| 3E.3 — Vector fallback gathering | ✅ Done | If symbol not in Graph, use Pinecone retrieval for the hunk (from Phase 1). |
+| 3E.4 — ReAct Agent (Optional) | 🔴 Skipped | Using deterministic + fallback hybrid retrieval per D-011. |
 | 3E.4 — Tiered review mode selector | 🔴 Not started | Auto-detect `full`/`standard`/`fast` based on provider capability. User override in repo settings. (D-014) |
 | 3E.5 — Hybrid retrieval merge | 🔴 Not started | Combine lexical (SQL ILIKE), vector (Pinecone), and graph (edge traversal) results. Dedupe by symbolId, rank by impact priority. (`graphrag.md` §13) |
 

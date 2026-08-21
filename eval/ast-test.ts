@@ -12,6 +12,7 @@ async function runTest() {
 
   console.log("\\n--- Parsing service.ts ---");
   const tree1 = parser.parse(serviceCode);
+  if (!tree1) return;
   const symbols1 = typescriptAdapter.extractSymbols(tree1, tsLanguage, serviceCode, "src/service.ts");
   const imports1 = typescriptAdapter.extractImports(tree1, tsLanguage, serviceCode, "src/service.ts");
   const calls1 = typescriptAdapter.extractCalls(tree1, tsLanguage, serviceCode, "src/service.ts");
@@ -20,6 +21,7 @@ async function runTest() {
 
   console.log("\\n--- Parsing controller.ts ---");
   const tree2 = parser.parse(controllerCode);
+  if (!tree2) return;
   const symbols2 = typescriptAdapter.extractSymbols(tree2, tsLanguage, controllerCode, "src/controller.ts");
   const imports2 = typescriptAdapter.extractImports(tree2, tsLanguage, controllerCode, "src/controller.ts");
   const calls2 = typescriptAdapter.extractCalls(tree2, tsLanguage, controllerCode, "src/controller.ts");

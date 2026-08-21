@@ -1,12 +1,8 @@
 import { z } from "zod";
-import {
-  retrieveContext,
-  retrieveContextForDiff,
-  type RetrievedChunk,
-} from "@/module/ai/lib/rag";
 import { generateObjectWithFallback } from "@/module/ai/lib/models";
 // @ts-ignore
 import parseDiff from "parse-diff";
+import { gatherReviewContext, InvestigatedChunk } from "./investigator";
 
 export const reviewSchema = z.object({
   summary: z.string().describe("Brief overview of the changes"),
@@ -67,40 +63,34 @@ export type RunReviewResult = {
 };
 
 async function retrieve(input: RunReviewInput): Promise<{
-  chunks: RetrievedChunk[];
+  chunks: InvestigatedChunk[];
   mode: RetrievalMode;
 }> {
   if (input.options?.skipRetrieval) return { chunks: [], mode: "skipped" };
 
-  const diffChunks = await retrieveContextForDiff(input.diff, input.repoId);
-  if (diffChunks.length > 0) return { chunks: diffChunks, mode: "diff" };
+  const chunks = await gatherReviewContext(input.repoId, input.diff);
+  
+  if (chunks.length > 0) {
+    const hasGraph = chunks.some(c => c.type === "graph");
+    return { chunks, mode: hasGraph ? "diff" : "fallback" }; 
+  }
 
-  const fallback =
-    (await retrieveContext(
-      `${input.title}\n${input.description}`,
-      input.repoId
-    )) ?? [];
-  const chunks: RetrievedChunk[] = fallback.map((content) => ({
-    path: "(unknown)",
-    content,
-    score: 0,
-  }));
-  return { chunks, mode: "fallback" };
+  return { chunks: [], mode: "fallback" };
 }
 
-function formatContextBlock(chunks: RetrievedChunk[]): string {
+function formatContextBlock(chunks: InvestigatedChunk[]): string {
   if (chunks.length === 0) {
     return "(no relevant context retrieved from the codebase index)";
   }
   return chunks
     .map(
       (c) =>
-        `### ${c.path}${c.score ? ` (relevance ${c.score.toFixed(2)})` : ""}\n${c.content}`
+        `### ${c.path} [${c.type.toUpperCase()}]${c.score ? ` (relevance ${c.score.toFixed(2)})` : ""}\n${c.content}`
     )
     .join("\n\n");
 }
 
-function buildPrompt(input: RunReviewInput, chunks: RetrievedChunk[]): string {
+function buildPrompt(input: RunReviewInput, chunks: InvestigatedChunk[]): string {
   const contextBlock = formatContextBlock(chunks);
 
   let profileSection = "";
@@ -128,7 +118,7 @@ Provide a comprehensive review using the provided JSON schema. Ensure all findin
 
 async function verifyFindings(
   input: RunReviewInput,
-  chunks: RetrievedChunk[],
+  chunks: InvestigatedChunk[],
   initialFindings: ReviewOutput["findings"]
 ): Promise<ReviewOutput["findings"]> {
   if (initialFindings.length === 0) return [];
