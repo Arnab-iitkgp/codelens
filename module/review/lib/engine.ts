@@ -62,6 +62,11 @@ export type RunReviewResult = {
   structured: ReviewOutput;
   latencyMs: number;
   meta: RunReviewMeta;
+  trace: {
+    chunks: InvestigatedChunk[];
+    initialFindings: ReviewOutput["findings"];
+    verifiedFindings: ReviewOutput["findings"];
+  };
 };
 
 async function retrieve(input: RunReviewInput): Promise<{
@@ -285,6 +290,9 @@ export async function runReview(
   
   const { object } = await generateObjectWithFallback(prompt, reviewSchema);
   
+  // Clone the raw findings before they get filtered, for the Agent Trace UI
+  const rawInitialFindings = JSON.parse(JSON.stringify(object.findings));
+  
   // Phase 0.4 & 5.1: Adversarial Verify Pass (The Defense Attorney)
   const reviewModeSetting = input.reviewMode ?? "fast";
   const verifiedFindings = await verifyFindings(input, chunks, object.findings, reviewModeSetting);
@@ -306,5 +314,10 @@ export async function runReview(
       chunkCount: chunks.length,
       provider: process.env.AI_PROVIDER ?? "google",
     },
+    trace: {
+      chunks,
+      initialFindings: rawInitialFindings,
+      verifiedFindings: groundedFindings
+    }
   };
 }

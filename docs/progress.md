@@ -108,7 +108,7 @@
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| Agent Trace UI | 🔴 Not started | Dashboard page showing pipeline execution: each agent step (Investigator tools called, Prosecutor findings, Defense verdicts), timing, token count, findings proposed/kept/dropped. |
+| Agent Trace UI | ✅ Done | Dashboard page showing pipeline execution: each agent step (Investigator tools called, Prosecutor findings, Defense verdicts), timing, token count, findings proposed/kept/dropped. |
 
 ## Phases NOT in scope (conscious decision)
 

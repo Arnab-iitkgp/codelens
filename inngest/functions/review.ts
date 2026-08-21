@@ -68,7 +68,7 @@ export const generateReview = inngest.createFunction(
         reviewMode = "fast";
       }
 
-      const { output, structured, latencyMs, meta } = await runReview({
+      const { output, structured, latencyMs, meta, trace } = await runReview({
         diff,
         title,
         description,
@@ -79,8 +79,8 @@ export const generateReview = inngest.createFunction(
       console.log(
         `[review] engine done: ${latencyMs}ms, retrieval=${meta.retrievalMode}, chunks=${meta.chunkCount}, provider=${meta.provider}`
       );
-      return { output, structured };
-    }) as { output: string, structured: ReviewOutput };
+      return { output, structured, trace };
+    }) as { output: string, structured: ReviewOutput, trace: any };
 
     await step.run("post-comment", async () => {
       await postInlineReview(token, owner, repo, prNumber, review.structured, review.output);
@@ -107,6 +107,7 @@ export const generateReview = inngest.createFunction(
             prTitle: title,
             prurl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
             review: review.output,
+            traceData: review.trace,
             status: "completed",
           },
         });

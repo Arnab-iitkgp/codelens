@@ -123,6 +123,12 @@ export default function ReviewsPage() {
                         </Button>
                       </DialogTrigger>
 
+                      <Button asChild variant="secondary" size="sm" className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">
+                        <Link href={`/dashboard/reviews/${review.id}/trace`}>
+                          View Agent Trace
+                        </Link>
+                      </Button>
+
                       {review.prurl && (
                         <Button asChild variant="outline" size="sm">
                           <Link
