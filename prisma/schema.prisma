@@ -33,19 +33,22 @@ model User {
 }
 
 model Repository {
-  id               String   @id @default(cuid())
-  githubId         BigInt   @unique
-  name             String
-  owner            String
-  fullName         String
-  url              String
-  userId           String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  indexedFileCount    Int      @default(0)
+  id                  String    @id @default(cuid())
+  githubId            BigInt    @unique
+  name                String
+  owner               String
+  fullName            String
+  url                 String
+  userId              String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  indexedFileCount    Int       @default(0)
   architectureProfile String?
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  graphBuiltAt        DateTime?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   reviews             Review[]
+  symbols             Symbol[]
+  edges               Edge[]
 
   @@index([userId])
   @@map("repository")
@@ -149,4 +152,53 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model Symbol {
+  id            String   @id @default(cuid())
+  repositoryId  String
+  path          String
+  name          String
+  qualifiedName String
+  kind          String
+  language      String
+  startLine     Int
+  endLine       Int
+  signature     String?
+  codeBody      String
+  isTest        Boolean  @default(false)
+  isExported    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  repository    Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  outgoingEdges Edge[]     @relation("EdgeSource")
+  incomingEdges Edge[]     @relation("EdgeTarget")
+
+  @@unique([repositoryId, path, qualifiedName])
+  @@index([repositoryId, name])
+  @@index([repositoryId, path])
+  @@map("symbol")
+}
+
+model Edge {
+  id             String   @id @default(cuid())
+  repositoryId   String
+  sourceSymbolId String
+  targetSymbolId String
+  kind           String
+  provenance     String
+  weight         Float    @default(1.0)
+  sourceFile     String
+  sourceLine     Int?
+  createdAt      DateTime @default(now())
+
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  sourceSymbol Symbol     @relation("EdgeSource", fields: [sourceSymbolId], references: [id], onDelete: Cascade)
+  targetSymbol Symbol     @relation("EdgeTarget", fields: [targetSymbolId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, sourceSymbolId, targetSymbolId, kind])
+  @@index([repositoryId, targetSymbolId])
+  @@index([repositoryId, sourceSymbolId])
+  @@map("edge")
 }

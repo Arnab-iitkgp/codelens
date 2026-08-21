@@ -21,14 +21,45 @@ a new architectural choice, add a new entry at the top (newest first) with:
 
 ---
 
-## D-011 · Investigator uses ReAct loop for context gathering
+## D-014 · Tiered review modes for API rate limits
 - **Date:** 2026-08-21
 - **Status:** accepted
-- **Context:** A static pipeline (always fetch diff, always vector search) is a workflow, not an agent. To be truly agentic and improve context relevance, the system needs to reason about what it doesn't know.
-- **Decision:** Implement a ReAct (Reason + Act) loop for the Investigator agent. It reads the diff, decides what symbols/files it needs to understand the changes, and calls a tool to fetch them from the code graph.
+- **Context:** The full agentic pipeline (ReAct + Prosecutor + 3× Defense) requires 5-7 LLM calls per review. On free-tier APIs like Groq (30 RPM, limited daily tokens), this risks rate limit exhaustion. Additionally, small models (≤20B params) often fail `generateObject` structured output.
+- **Decision:** Implement three review modes — `full` (5-6 calls: ReAct + Prosecutor + 3× Defense), `standard` (4 calls: deterministic graph + Prosecutor + 3× Defense), `fast` (2 calls: deterministic graph + Prosecutor + 1× Defense). Mode is auto-selected based on provider capability or user override. The graph traversal (SQL queries) is free in ALL modes — it's the LLM verification passes that scale.
 - **Alternatives considered:**
-  - Fixed pipeline (embed diff, vector search top K): Fails on complex logic where the relevant context isn't semantically similar to the diff text.
-- **Consequences:** Makes the system a true autonomous agent. Requires one additional LLM call (planning what to fetch) before the review, adding slight latency but massively improving context precision.
+  - Always run full pipeline: Breaks on free tiers, wastes budget on small PRs.
+  - Let user manually pick: Too much UX friction.
+- **Consequences:** Even the `fast` mode produces dramatically better reviews than the current system because the context comes from the Code Knowledge Graph (deterministic SQL) instead of random vector blobs. The ReAct agent is an upgrade, not a requirement.
+
+## D-013 · Hybrid graph indexer with language fallback
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Context:** Building full semantic resolution for every language is infeasible. But AST extraction for nodes via Tree-sitter is easy across 20+ languages. The real cost is in the resolver (cross-file edge stitching).
+- **Decision:** Route files through two paths during indexing. Supported languages (TS/JS first, Python second) get full Graph treatment: Tree-sitter AST → Symbol/Edge extraction → 3-tier resolution (deterministic → heuristic → optional native). Unsupported languages fall back to the existing 500-token text chunking into Pinecone. Pinecone vectors get a `type` metadata field (`symbol` vs `chunk`) so retrieval knows the difference.
+- **Alternatives considered:**
+  - Graph-only (no fallback): Breaks for Go, Rust, Java repos entirely.
+  - Chunk-only (no graph): Loses all structural intelligence — the whole point of Phase 3.
+- **Consequences:** Language-agnostic schema, language-specific adapters. Adding a new language means writing one adapter file + `.scm` query file. No core changes needed.
+
+## D-012 · Canonical graph schema with PR-reviewer-specific edge design
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Context:** Graphify's schema is designed for visual code exploration dashboards. Our schema must be designed for PR regression detection. Key differences: we need `isTest` on symbols (to rank production callers over test callers), `provenance` on edges (so the LLM knows which relationships are proven vs guessed), and `weight` on edges (for impact ranking).
+- **Decision:** Two new Prisma models: `Symbol` (nodes — functions, classes, interfaces with `qualifiedName`, `codeBody`, `isTest`, `isExported`) and `Edge` (relationships — CALLS, IMPORTS, EXTENDS, IMPLEMENTS, CONTAINS, TESTS, USES with `provenance`: EXTRACTED/RESOLVED/INFERRED and `weight` for ranking). Indexed on `targetSymbolId` for the critical "who calls this?" reverse lookup.
+- **Alternatives considered:**
+  - Mirroring Graphify's schema directly: Missing PR-specific fields (`isTest`, `weight`, `provenance`).
+  - Using a graph database (Neo4j): Adds infra dependency. Prisma + PostgreSQL with proper indexes handles our traversal depth (1-2 hops) easily.
+- **Consequences:** Schema is language-agnostic. All language adapters produce the same `Symbol`/`Edge` records. The review engine queries the graph identically regardless of source language.
+
+## D-011 · Investigator uses deterministic-first graph traversal, optionally agentic
+- **Date:** 2026-08-21
+- **Status:** accepted (revised — deterministic-first, agentic-optional)
+- **Context:** A static pipeline (always fetch diff, always vector search) is a workflow, not an agent. To be truly agentic and improve context relevance, the system needs to reason about what it doesn't know. However, the agentic ReAct loop requires extra LLM calls and a model that reliably produces structured output.
+- **Decision:** The Investigator always performs deterministic graph traversal first (parse diff → find modified symbols → SQL getCallers/getCallees → vector search — zero LLM cost). On top of that, if the model supports it and rate limit budget allows, an optional ReAct loop lets the LLM request additional context. This ensures the graph intelligence works even on the weakest/cheapest models.
+- **Alternatives considered:**
+  - Pure ReAct (LLM decides everything): Breaks on weak models that can't produce tool-call schemas. Wastes budget.
+  - Fixed pipeline only (no agent): Misses context that requires adaptive reasoning (e.g., "this security change also affects the auth middleware").
+- **Consequences:** The deterministic path delivers 80%+ of the context quality for zero LLM cost. The ReAct agent is a quality multiplier, not a requirement. Review mode (`fast`/`standard`/`full`) controls whether the agent runs (see D-014).
 
 ## D-010 · Large PRs: file-level parallel review with structure-first walkthrough
 - **Date:** 2026-08-20

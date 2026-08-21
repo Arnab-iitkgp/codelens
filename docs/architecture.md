@@ -174,7 +174,7 @@ generateTextWithFallback():
 
 ## 7. Planned Target Architecture
 
-### 7.1 Multi-Agent Review Pipeline
+### 7.1 Multi-Agent Review Pipeline (D-011, D-014)
 
 ```
 PR webhook → fetch diff
@@ -184,20 +184,30 @@ PR webhook → fetch diff
   │    ├── Structure scan (file names + hunk headers) → walkthrough (parallel)
   │    └── Dispatch per-file-group review agents (parallel)
   │
-  ├──► [INVESTIGATOR] ReAct Loop (Reason + Act)
-  │    ├── Observe: Parse diff hunks → identify modified symbols
-  │    ├── Reason: LLM decides "I need to understand what X does and who calls Y"
-  │    ├── Act: Calls tools to query symbol/edge tables and Pinecone
-  │    └── Repeat: Can ask for more context if still uncertain
+  ├──► [INVESTIGATOR] Deterministic-first, optionally agentic (D-011)
+  │    │
+  │    │  ALWAYS (zero LLM cost):
+  │    ├── Parse diff → identify modified line ranges
+  │    ├── SQL: which Symbols overlap these ranges?
+  │    ├── SQL: getCallers(symbol) — "who depends on this?"
+  │    ├── SQL: getCallees(symbol) — "what does this call?"
+  │    ├── Pinecone: vector search for semantically similar code
+  │    ├── Rank by impact table (production callers > tests)
+  │    │
+  │    │  OPTIONAL (full mode only, 1-2 extra LLM calls):
+  │    ├── ReAct loop: LLM reasons about evidence gaps
+  │    └── Calls graph tools for additional context (max 3 iterations)
   │
   ├──► [PROSECUTOR] Generate structured findings (generateObject + Zod)
   │    └── One finding at a time on curated evidence, not "review the whole diff"
   │
-  ├──► [DEFENSE] 3× adversarial verify with majority vote
-  │    ├── Lens 1: Correctness — "Is this actually a bug?"
-  │    ├── Lens 2: Security — "Is this a real vulnerability?"
-  │    ├── Lens 3: Runtime-reality — "Would this actually fail in production?"
-  │    └── Default to refuted on tie. Confidence = notRefuted / 3.
+  ├──► [DEFENSE] Adversarial verify (D-009, D-014)
+  │    ├── full/standard mode: 3× verify with majority vote
+  │    │   ├── Lens 1: Correctness — "Is this actually a bug?"
+  │    │   ├── Lens 2: Security — "Is this a real vulnerability?"
+  │    │   ├── Lens 3: Runtime-reality — "Would this actually fail in production?"
+  │    │   └── Default to refuted on tie. Confidence = notRefuted / 3.
+  │    └── fast mode: 1× verify (existing adversarial logic)
   │
   ├──► [JUDGE] Deterministic gates
   │    ├── Existence check: file must be in PR's changed-files list
@@ -209,45 +219,89 @@ PR webhook → fetch diff
        └── Each finding = one inline comment with severity + confidence badge
 ```
 
-### 7.2 Code Intelligence Layer (tree-sitter)
+### 7.2 Review Mode Tiers (D-014)
+
+| Mode | LLM Calls | When | Graph Context? |
+| ---- | --------- | ---- | -------------- |
+| `fast` | 2 (Prosecutor + 1× Defense) | Weak models, free-tier rate limits | ✅ Yes (SQL) |
+| `standard` | 4 (Prosecutor + 3× Defense) | Medium models (Gemini Flash, Llama 8B) | ✅ Yes (SQL) |
+| `full` | 5-6 (ReAct + Prosecutor + 3× Defense) | Strong models (Gemini Pro, Llama 70B+) | ✅ Yes (SQL + agent) |
+
+All modes benefit from the Code Knowledge Graph. The graph traversal is pure SQL — zero LLM cost. Only the verification/agentic passes scale with model budget.
+
+### 7.3 Code Intelligence Layer — Hybrid Indexer (D-008, D-013)
 
 ```
 At indexing time (repository.connected):
 
   Files fetched from GitHub
     │
-    ▼
-  web-tree-sitter parses each file
+    ├── Language router
+    │   │
+    │   ├── .ts/.tsx/.js/.jsx/.py → GRAPH PATH
+    │   │   │
+    │   │   ├── web-tree-sitter parses each file
+    │   │   │
+    │   │   ├── Language adapter extracts raw facts:
+    │   │   │   ├── Symbols: functions, classes, methods, interfaces
+    │   │   │   ├── Imports: import statements with source paths
+    │   │   │   └── Calls: call expressions with identifiers
+    │   │   │
+    │   │   ├── 3-Tier Resolver stitches cross-file edges:
+    │   │   │   ├── Tier 1 — Deterministic (import + call = proven edge)
+    │   │   │   ├── Tier 2 — Heuristic (constructor injection → inferred)
+    │   │   │   └── Tier 3 — Native analysis (optional, future)
+    │   │   │
+    │   │   ├── Store in Prisma:
+    │   │   │   ├── Symbol { qualifiedName, codeBody, kind, isTest, isExported }
+    │   │   │   └── Edge { kind, provenance, weight }
+    │   │   │
+    │   │   └── Store in Pinecone:
+    │   │       └── One vector per Symbol (metadata: { type: 'symbol', symbolId })
+    │   │
+    │   └── all other extensions → CHUNK PATH (fallback)
+    │       ├── Split into 500-token text chunks
+    │       └── Store in Pinecone (metadata: { type: 'chunk', path })
     │
-    ├──► .scm queries extract:
-    │    ├── Definitions: functions, classes, methods, types
-    │    ├── References: call expressions, identifier usages
-    │    └── Imports: import statements with source paths
-    │
-    ├──► Store in Prisma:
-    │    ├── Symbol { repoId, path, name, kind, startLine, endLine, signature, body }
-    │    └── Edge { fromSymbolId, toSymbolId, kind: calls|imports|inherits }
-    │
-    └──► Store in Pinecone:
-         └── One vector per symbol (not per file)
-             Metadata: { repoId, path, symbol, kind, startLine, endLine }
+    └── Update repository.graphBuiltAt timestamp
 
 At review time:
 
-  Diff hunks → identify modified symbols (line range overlap)
+  Diff hunks → identify modified symbols (line range overlap with Symbol table)
     │
-    ├── What does this code call? → fetch callee definitions
-    ├── Who calls this code? → fetch caller snippets (blast radius)
-    └── Inject as labeled context to the Prosecutor agent
+    ├── Lexical: SQL ILIKE on Symbol.name for exact identifiers
+    ├── Vector: Pinecone search for semantically similar symbols/chunks
+    ├── Graph: Edge table traversal — callers, callees, implementors
+    │
+    └── Merge, deduplicate by symbolId, rank by impact priority
+        └── Feed top ~10 as labeled evidence to the Prosecutor
 ```
 
-### 7.3 Supported Languages
+### 7.4 Graph Schema (D-012)
 
-| Language | Grammar | Status |
-| -------- | ------- | ------ |
-| TypeScript / JavaScript | `tree-sitter-typescript` WASM | Planned (primary) |
-| Python | `tree-sitter-python` WASM | Planned (for Django/FastAPI eval PRs) |
-| Others | Add grammar `.wasm` + `.scm` query file | Future |
+```
+Symbol (nodes)
+  ├── qualifiedName    "PaymentService.charge"
+  ├── codeBody         Full source text of the symbol
+  ├── kind             function | class | method | interface | ...
+  ├── isTest           Deprioritize in impact ranking
+  ├── isExported       Public API surface marker
+  └── language         typescript | python | ...
+
+Edge (relationships)
+  ├── kind             CALLS | IMPORTS | EXTENDS | IMPLEMENTS | CONTAINS | TESTS | USES
+  ├── provenance       EXTRACTED | RESOLVED | INFERRED
+  └── weight           Impact ranking (1.0 = direct caller, 0.5 = indirect)
+```
+
+### 7.5 Supported Languages
+
+| Language | Grammar | Adapter | Resolution Quality |
+| -------- | ------- | ------- | ------------------ |
+| TypeScript / TSX | `tree-sitter-typescript` WASM | Full | Tier 1 + Tier 2 |
+| JavaScript / JSX | `tree-sitter-javascript` WASM | Full | Tier 1 + Tier 2 |
+| Python | `tree-sitter-python` WASM | Basic | Tier 1 |
+| All others | N/A | Fallback to text chunking | N/A |
 
 ## 8. What Is NOT In Scope
 
@@ -258,4 +312,4 @@ At review time:
 | Repo audit mode (Phase 4.5) | Too much UI/infra for the timeline |
 | Re-indexing on push (Phase 7) | Operational concern, not impressive for CV |
 | Heavy analyzers in Docker (Phase 8) | Too much infra |
-
+| Tier 3 native analysis (tsc, pyright) | Future optimization, not v1 |

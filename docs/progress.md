@@ -39,33 +39,69 @@
 | 1.2 — Repo profile generator | ✅ Done | Sample 20 files via GitHub Tree API, feed into `generateObject` with `profileSchema`, and save as markdown string to DB. |
 | 1.3 — Inject profile into prompt | ✅ Done | Included natively via `buildPrompt` in `engine.ts` during Phase 0.6. |
 
-## Phase 3 — Code Intelligence (tree-sitter)
+## Phase 3 — Graph-Native Code Intelligence
 
-> Decision D-008: Build our own using `web-tree-sitter` (npm), inspired by
-> Graphify (109K★) and Aider's repo map. Native to our Node.js stack, integrated
-> with Prisma. See `docs/decisions.md` for rationale.
+> Decisions: D-008 (web-tree-sitter), D-011 (deterministic-first investigator),
+> D-012 (canonical graph schema), D-013 (hybrid indexer with fallback),
+> D-014 (tiered review modes for rate limits).
+> Inspired by Graphify and `graphrag.md` vision document.
+
+### 3A — Database & Schema
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 3.1 — tree-sitter setup + symbol extraction | 🔴 Not started | `web-tree-sitter` + TS/JS/Python grammars. `.scm` query files for definitions, references, imports. Output: `{ name, kind, signature, startLine, endLine, body }[]` per file. |
-| 3.2 — Symbol + Edge tables in Prisma | 🔴 Not started | `Symbol { repoId, path, name, kind, startLine, endLine, signature, body, language }`, `Edge { fromSymbol, toSymbol, kind: 'calls'\|'imports'\|'inherits' }` |
-| 3.3 — Per-symbol embeddings in Pinecone | 🔴 Not started | Replace whole-file vectors with one vector per symbol. Metadata: `{repoId, path, symbol, kind, startLine, endLine}` |
-| 3.4 — Diff-driven symbol lookup at review time | 🔴 Not started | Parse changed hunks → find modified symbols → fetch their definitions + callers from graph → inject as labeled context. |
-| 3.5 — Existence checks against symbol table | 🔴 Not started | Verify cited symbols exist before posting findings. |
-| 3.6 — ReAct Agent Loop (Investigator) | 🔴 Not started | Implement `generateObject` where the LLM reasons about the diff and calls tools to request specific symbols from the graph. |
+| 3A.1 — Symbol model in Prisma | ✅ Done | `Symbol { qualifiedName, codeBody, kind, isTest, isExported, language, startLine, endLine }`. Unique on `(repoId, path, qualifiedName)`. |
+| 3A.2 — Edge model in Prisma | ✅ Done | `Edge { kind, provenance (EXTRACTED/RESOLVED/INFERRED), weight }`. Indexed on `targetSymbolId` for "who calls this?" queries. |
+| 3A.3 — Repository relations | ✅ Done | Add `symbols`, `edges`, `graphBuiltAt` to Repository model. Run migration. |
+
+### 3B — Tree-sitter & Extraction
+
+| Task | Status | Notes |
+| ---- | ------ | ----- |
+| 3B.1 — WASM parser init | ✅ Done | `module/ast/lib/parser.ts` — load `web-tree-sitter` + grammar `.wasm` files. Test in Next.js serverless environment. |
+| 3B.2 — Language adapter interface | ✅ Done | `module/ast/lib/adapters/types.ts` — `LanguageAdapter { extractSymbols, extractImports, extractCalls }`. Language-agnostic core, language-specific adapters. |
+| 3B.3 — TypeScript/JS adapter | ✅ Done | `module/ast/lib/adapters/typescript.ts` — `.scm` queries for functions, classes, methods, interfaces, imports, call expressions. Primary adapter. |
+| 3B.4 — Python adapter | 🔴 Not started | `module/ast/lib/adapters/python.ts` — basic functions, classes, imports. Second priority, for Django/FastAPI eval PRs. |
+
+### 3C — Symbol Resolution (3-tier)
+
+| Task | Status | Notes |
+| ---- | ------ | ----- |
+| 3C.1 — Deterministic resolution | ✅ Done | `module/ast/lib/resolver.ts` — Identifies `import { X } from './y'` + `X.method()` as proven `CALLS` edges (provenance: `EXTRACTED`). |
+| 3C.2 — Heuristic resolution | ✅ Done | Identifies `this.service.doThing()` as an `INFERRED` edge for agent hinting. |
+| 3C.3 — Resolver pipeline | ✅ Done | `resolveGraphEdges()` connects facts across the repository in memory. |
+
+### 3D — Hybrid Indexer
+
+| Task | Status | Notes |
+| ---- | ------ | ----- |
+| 3D.1 — Language router in indexer | 🔴 Not started | Update `inngest/functions/index.ts` — route `.ts/.js/.py` to graph path, all others to existing chunk path. |
+| 3D.2 — Graph indexing path | 🔴 Not started | Parse → extract → resolve → upsert Symbols + Edges to Prisma. |
+| 3D.3 — Per-symbol embeddings | 🔴 Not started | Embed each Symbol's `codeBody` → Pinecone with metadata `{ type: 'symbol', symbolId, repoId, kind }`. |
+| 3D.4 — Chunk fallback path | 🔴 Not started | Existing 500-token chunking for unsupported languages, with metadata `{ type: 'chunk' }`. |
+
+### 3E — Review Engine Upgrade
+
+| Task | Status | Notes |
+| ---- | ------ | ----- |
+| 3E.1 — Graph query functions | 🔴 Not started | `module/ast/lib/graph.ts` — `getCallers()`, `getCallees()`, `getSymbolByName()`, `getSymbolsInRange()`. Pure SQL, zero LLM cost. |
+| 3E.2 — Deterministic investigator | 🔴 Not started | Replace `retrieve()` in `engine.ts`. Parse diff → find modified symbols → getCallers/getCallees → vector search → rank by impact table → assemble evidence. Works on ALL models. (D-011) |
+| 3E.3 — ReAct agent loop (optional) | 🔴 Not started | `module/review/lib/investigator.ts`. Runs only in `full` review mode. LLM reasons about evidence gaps and calls graph tools for more context. Max 3 iterations. (D-011, D-014) |
+| 3E.4 — Tiered review mode selector | 🔴 Not started | Auto-detect `full`/`standard`/`fast` based on provider capability. User override in repo settings. (D-014) |
+| 3E.5 — Hybrid retrieval merge | 🔴 Not started | Combine lexical (SQL ILIKE), vector (Pinecone), and graph (edge traversal) results. Dedupe by symbolId, rank by impact priority. (`graphrag.md` §13) |
 
 ## Phase 5 — Verify, Vote, Calibrate
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 5.1 — 3× adversarial verify with majority vote | 🔴 Not started | Three parallel `generateObject` calls with different lenses (correctness, security, runtime-reality). |
+| 5.1 — 3× adversarial verify with majority vote | 🔴 Not started | Three parallel `generateObject` calls with different lenses (correctness, security, runtime-reality). Only in `full` and `standard` modes. `fast` mode uses 1× verify (existing logic). (D-009, D-014) |
 | 5.3 — Confidence score per finding | 🔴 Not started | `confidence = notRefuted / totalVotes`. Visible badge on inline comments. |
 
 ## UI / Observability
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| Agent Trace UI | 🔴 Not started | Dashboard page showing pipeline execution: each agent step, timing, token count, findings proposed/kept/dropped. |
+| Agent Trace UI | 🔴 Not started | Dashboard page showing pipeline execution: each agent step (Investigator tools called, Prosecutor findings, Defense verdicts), timing, token count, findings proposed/kept/dropped. |
 
 ## Phases NOT in scope (conscious decision)
 
@@ -102,6 +138,18 @@
 - Completed Phase 0.6 & 1: Added `architectureProfile` to Prisma, built a heuristic GitHub Tree file sampler (scoring config and src files), and wired up a new Inngest background job to auto-generate architectural conventions.
 - **Next session:** Decide between Phase 0.7 (Large PR Chunking) or Phase 3 (Tree-Sitter WASM code intelligence).
 
+### 2026-08-21 — Phase 3 Architecture Design (Graph-Native Code Intelligence)
+- Deep-dived Graphify source code (`extract.py`, `analyze.py`, `resolution.py`) to understand production-grade code graph extraction
+- Brainstormed: AST vs Semantic resolution complexity — concluded 3-tier resolution (deterministic → heuristic → optional native)
+- Brainstormed: Edge schema design specifically for PR review (provenance, isTest, weight for impact ranking)
+- Brainstormed: Regression detection pipeline — graph traversal provides evidence, LLM reasons about it
+- Brainstormed: Rate limit concerns for free-tier APIs — redesigned Investigator from pure-agentic to **deterministic-first, agentic-optional**
+- Created 4 new architectural decisions: D-012 (graph schema), D-013 (hybrid indexer), D-014 (tiered review modes), revised D-011 (deterministic-first investigator)
+- Expanded Phase 3 task list from 6 tasks to 18 tasks across 5 sub-phases (3A–3E)
+- Created comprehensive unified implementation plan artifact
+- Updated `docs/decisions.md`, `docs/progress.md`
+- **Next session:** Start Phase 3A — implement Symbol + Edge models in `schema.prisma` and run migration
+
 ---
 
 ## Blockers / Open Questions
@@ -110,3 +158,6 @@
 - [ ] Verify `generateObject` support across Google, OpenAI, Groq providers
 - [ ] Pinecone index dimension tied to embedding model (768-dim for text-embedding-004)
 - [ ] `web-tree-sitter` WASM file serving in Next.js serverless — needs testing
+- [ ] Pinecone migration strategy: side-by-side (`type: symbol` vs `type: chunk`) or wipe and re-index?
+- [ ] Which Groq models reliably support `generateObject` structured output for the ReAct agent?
+
