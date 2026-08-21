@@ -322,7 +322,7 @@ export async function runReview(
   let totalRetrievedChunks = 0;
   
   // 2. Process each chunk in parallel
-  const reviewModeSetting = input.reviewMode ?? "fast";
+  const reviewModeSetting = input.reviewMode ?? "standard";
   const provider = process.env.AI_PROVIDER ?? "google";
 
   const chunkPromises = diffChunks.map(async (diffChunk) => {

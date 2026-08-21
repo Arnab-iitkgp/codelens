@@ -62,12 +62,8 @@ export const generateReview = inngest.createFunction(
     // per-substep durability becomes valuable later, split back out.
     const review = await step.run("run-review-engine", async () => {
       // Auto-detect tiered review mode (Phase 3E.4 & Phase 5)
-      // Groq has tight rate limits, so default to 'fast' mode (1x verify).
-      // OpenAI and Google are robust enough for 'standard' (3x majority vote).
-      let reviewMode: "fast" | "standard" | "full" = "standard";
-      if (process.env.AI_PROVIDER === "groq") {
-        reviewMode = "fast";
-      }
+      // We now have API key rotation and chunking, so we can safely default to 'standard' (3x majority vote) for all providers.
+      const reviewMode: "fast" | "standard" | "full" = "standard";
 
       const { output, structured, latencyMs, meta, trace } = await runReview({
         diff,
