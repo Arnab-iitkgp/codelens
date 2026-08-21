@@ -65,15 +65,19 @@ export async function gatherReviewContext(
     }
   }
 
-  // 2. Vector Fallback
-  const fallbackChunks = await retrieveContextForDiff(diffText, repoId);
-  for (const fallback of fallbackChunks) {
-    contextChunks.push({
-      path: fallback.path,
-      content: `[VECTOR MATCH]\n${fallback.content}`,
-      score: fallback.score,
-      type: "vector"
-    });
+  // 2. Vector Fallback (ONLY if Graph traversal found nothing)
+  // If we already have dense graph nodes (like TS files), we don't want to pollute 
+  // the context window with massive unstructured Pinecone text dumps.
+  if (contextChunks.length === 0) {
+    const fallbackChunks = await retrieveContextForDiff(diffText, repoId);
+    for (const fallback of fallbackChunks) {
+      contextChunks.push({
+        path: fallback.path,
+        content: `[VECTOR MATCH]\n${fallback.content}`,
+        score: fallback.score,
+        type: "vector"
+      });
+    }
   }
 
   // Deduplicate and cap

@@ -4,13 +4,15 @@ import { groq } from "@ai-sdk/groq";
 
 // ── API Key Rotation (Google) ──────────────────
 
-let currentGoogleKeyIndex = 0;
+let currentGoogleKeyIndex = Math.floor(Math.random() * 1000);
 
 function getNextGoogleProvider() {
   const keysStr = process.env.GOOGLE_GENERATIVE_AI_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (keysStr) {
     const keys = keysStr.split(",").map((k) => k.trim()).filter(Boolean);
     if (keys.length > 0) {
+      // Use randomness to distribute load across keys in Serverless environments
+      // where global state doesn't persist across parallel step invocations.
       const selectedKey = keys[currentGoogleKeyIndex % keys.length];
       currentGoogleKeyIndex++;
       // Create a custom google provider instance with the rotated key
@@ -152,6 +154,11 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
 
       if (provider !== primaryProvider) {
         console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed for object generation. Successfully rerouted to '${provider}' with zero downtime.`);
+      }
+
+      // LOG TOKEN USAGE
+      if (response.usage) {
+        console.log(`[AI Tokens] Provider: ${provider} | Input: ${response.usage.promptTokens} | Output: ${response.usage.completionTokens}`);
       }
 
       return response;
