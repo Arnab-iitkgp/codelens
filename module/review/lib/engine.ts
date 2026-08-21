@@ -183,19 +183,22 @@ async function verifyFindings(
   }
 
   // 3x Majority Vote (standard | full)
-  const [correctness, security, runtime] = await Promise.all([
-    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on logic errors, off-by-one errors, state management, and type safety. Reject style nits or theoretical issues."),
-    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on injection, auth bypass, race conditions, and data leakage. Reject general code quality nits."),
-    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on performance, memory leaks, unhandled edge cases, and environment assumptions. Reject stylistic complaints.")
+  // We use 3 generalist personas instead of strict specialists.
+  // Strict specialists (e.g. "Focus EXCLUSIVELY on security") will always reject correctness bugs, 
+  // making a 2/3 majority mathematically impossible for standard bugs.
+  const [reviewerA, reviewerB, reviewerC] = await Promise.all([
+    verifySingleLens(input, chunks, initialFindings, "Act as a Senior Frontend/Backend Engineer. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
+    verifySingleLens(input, chunks, initialFindings, "Act as a Principal Architect. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
+    verifySingleLens(input, chunks, initialFindings, "Act as a QA & Reliability Expert. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits.")
   ]);
 
   const verifiedFindings: ReviewOutput["findings"] = [];
 
   for (const finding of initialFindings) {
     let votes = 0;
-    if (correctness.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
-    if (security.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
-    if (runtime.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    if (reviewerA.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    if (reviewerB.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    if (reviewerC.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
 
     // Majority vote (2 out of 3)
     if (votes >= 2) {
