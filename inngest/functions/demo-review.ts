@@ -180,7 +180,7 @@ ${diff}
 
 Please provide:
 1. **Walkthrough**: A file-by-file explanation of the changes. Keep it short, concise and to the point.
-2. **Sequence Diagram**: A Mermaid JS sequence diagram visualizing the flow of the changes (if applicable). Use \`\`\`mermaid ... \`\`\` block. **IMPORTANT**: Ensure the Mermaid syntax is valid. Do not use special characters (like quotes, braces, parentheses) inside Note text or labels as it breaks rendering. Keep the diagram simple.
+2. **Sequence Diagram**: A Mermaid JS sequence diagram visualizing the flow of the changes (if applicable). Use \`\`\`mermaid ... \`\`\` block. **IMPORTANT**: Ensure the Mermaid syntax is strictly valid. Do not use quotes around participant names. For notes, you MUST use 'Note over [Participant]:' or 'Note right of [Participant]:'. Never use 'note [Participant]' without a position. Keep it simple.
 3. **Summary**: Brief overview.
 4. **Strengths**: What's done well.
 5. **Issues**: Bugs, security concerns, code smells.

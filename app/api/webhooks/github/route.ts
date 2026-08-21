@@ -20,20 +20,23 @@ export async function POST (req:NextRequest){
             const repo = body.repository.full_name
             const [owner,repoName] = repo.split("/");
             console.log(`Pull request #${prNumber} in repository ${repoName} has action: ${action}`);
-            if(action ==="opened" || action==="synchronize" || action==="reopened"){
-                reviewPullRequest(owner,repoName,prNumber).then(()=>{
-                    console.log(`Reviewed pull request #${prNumber} in repository ${repoName}`);
-                }).catch((error)=>{
-                    console.error(`Failed to review pull request #${prNumber} in repository ${repoName}:`,error);
-                });
-        }
+            
+            if (action === "opened" || action === "synchronize" || action === "reopened") {
+                try {
+                    await reviewPullRequest(owner, repoName, prNumber);
+                    console.log(`Successfully queued review for PR #${prNumber} in repository ${repoName}`);
+                } catch (error) {
+                    console.error(`Failed to queue review for pull request #${prNumber} in repository ${repoName}:`, error);
+                }
+            }
 
 
         return NextResponse.json({msg:"event processed"},{status:200})
-    } 
-}
-    catch (error) {
-        console.error("Failed to process GitHub webhook:",error);
-        return NextResponse.json({msg:"Internal Server Error"},{status:500})
+        }
+
+        return NextResponse.json({ msg: "event ignored" }, { status: 200 })
+    } catch (error) {
+        console.error("Failed to process GitHub webhook:", error);
+        return NextResponse.json({ msg: "Internal Server Error" }, { status: 500 })
     }
 }
