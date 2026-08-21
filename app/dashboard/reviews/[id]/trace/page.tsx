@@ -105,9 +105,14 @@ export default async function TracePage(props: { params: Promise<{ id: string }>
                         <div className="line-clamp-2 text-sm">{finding.claim}</div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                        <a 
+                          href={`https://github.com/${review.repository.fullName}/blob/main/${finding.file}#L${finding.startLine}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-blue-500 hover:underline inline-flex items-center gap-1"
+                        >
                           {finding.file}:{finding.startLine}
-                        </span>
+                        </a>
                       </TableCell>
                       <TableCell className="text-center">
                         {isKept ? (
