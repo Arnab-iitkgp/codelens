@@ -63,6 +63,7 @@ export async function indexCodebase(
     { concurrency: 5 } // 5 at a time to stay safe on API limits
   );
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validVectors = vectors.filter(Boolean) as any[];
 
   if (validVectors.length > 0) {
@@ -108,6 +109,7 @@ export async function indexGraphSymbols(
     { concurrency: 5 }
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validVectors = vectors.filter(Boolean) as any[];
 
   if (validVectors.length > 0) {

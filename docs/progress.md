@@ -67,7 +67,7 @@
 | 3B.1 — WASM parser init | ✅ Done | `module/ast/lib/parser.ts` — load `web-tree-sitter` + grammar `.wasm` files. Test in Next.js serverless environment. |
 | 3B.2 — Language adapter interface | ✅ Done | `module/ast/lib/adapters/types.ts` — `LanguageAdapter { extractSymbols, extractImports, extractCalls }`. Language-agnostic core, language-specific adapters. |
 | 3B.3 — TypeScript/JS adapter | ✅ Done | `module/ast/lib/adapters/typescript.ts` — `.scm` queries for functions, classes, methods, interfaces, imports, call expressions. Primary adapter. |
-| 3B.4 — Python adapter | 🔴 Not started | `module/ast/lib/adapters/python.ts` — basic functions, classes, imports. Second priority, for Django/FastAPI eval PRs. |
+| 3B.4 — Python adapter | ✅ Done | `module/ast/lib/adapters/python.ts` — basic functions, classes, imports. Second priority, for Django/FastAPI eval PRs. |
 
 ### 3C — Symbol Resolution (3-tier)
 
@@ -156,6 +156,14 @@
 - Created comprehensive unified implementation plan artifact
 - Updated `docs/decisions.md`, `docs/progress.md`
 - **Next session:** Start Phase 3A — implement Symbol + Edge models in `schema.prisma` and run migration
+
+### 2026-08-21 — Python AST Adapter & Types Refactoring
+- Completed Phase 3B.4: Created `module/ast/lib/adapters/python.ts` using `tree-sitter-python`.
+- Refactored `module/ast/lib/parser.ts` to dynamically load and cache multiple WASM language files.
+- Updated `inngest/functions/index.ts` to route Python (`.py`) files to the new graph extraction adapter.
+- Fixed strict TypeScript / ESLint issues across the codebase by replacing `any` bypassing with strict native types from `@types/parse-diff`.
+- Excluded test fixture directories from the core build to ensure flawless Next.js production builds.
+- **Next session:** Verify extraction natively on a Python repository.
 
 ---
 

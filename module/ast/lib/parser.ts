@@ -4,10 +4,12 @@ import path from "path";
 import fs from "fs";
 
 let isInitialized = false;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSParser = (ParserNS as any).Parser || ParserNS;
 export let tsLanguage: Language;
+const languageCache: Record<string, Language> = {};
 
-export async function getParser(wasmFilename: string): Promise<Parser> {
+export async function getParser(wasmFilename: string): Promise<{ parser: Parser, language: Language }> {
   if (!isInitialized) {
     await TSParser.init();
     isInitialized = true;
@@ -15,21 +17,25 @@ export async function getParser(wasmFilename: string): Promise<Parser> {
 
   const parser = new TSParser();
   
-  // In Next.js/Inngest environments (Node.js backend), we can read the file directly
-  // from the public directory where we copied the WASM binaries.
-  const wasmPath = path.join(process.cwd(), "public", "tree-sitter", wasmFilename);
-  
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error("Tree-sitter WASM file not found at: " + wasmPath);
+  // Cache languages to avoid reloading same wasm
+  if (!languageCache[wasmFilename]) {
+    const wasmPath = path.join(process.cwd(), "public", "tree-sitter", wasmFilename);
+    if (!fs.existsSync(wasmPath)) {
+      throw new Error("Tree-sitter WASM file not found at: " + wasmPath);
+    }
+    const wasmBuffer = fs.readFileSync(wasmPath);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    languageCache[wasmFilename] = await (ParserNS as any).Language.load(wasmBuffer);
   }
 
-  // Parser.Language.load() accepts a file path in Node environments, 
-  // or a Uint8Array of the WASM file contents.
-  const wasmBuffer = fs.readFileSync(wasmPath);
-  const Lang = await (ParserNS as any).Language.load(wasmBuffer);
-  tsLanguage = Lang;
+  const Lang = languageCache[wasmFilename];
+  
+  // For backwards compatibility where people imported tsLanguage directly
+  if (wasmFilename.includes("typescript")) {
+    tsLanguage = Lang;
+  }
   
   parser.setLanguage(Lang);
   
-  return parser;
+  return { parser, language: Lang };
 }

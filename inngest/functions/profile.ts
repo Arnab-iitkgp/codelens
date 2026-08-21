@@ -11,7 +11,7 @@ export const generateProfile = inngest.createFunction(
   async ({ event, step }) => {
     const { owner, repo, userId } = event.data;
 
-    const { files, token } = await step.run("fetch-sample-files", async () => {
+    const { files } = await step.run("fetch-sample-files", async () => {
       const account = await prisma.account.findFirst({
         where: {
           userId,
@@ -23,8 +23,8 @@ export const generateProfile = inngest.createFunction(
       }
 
       const files = await getRepoSampleFiles(account.accessToken, owner, repo, 20);
-      return { files, token: account.accessToken };
-    }) as { files: { path: string, content: string }[], token: string };
+      return { files };
+    }) as { files: { path: string, content: string }[] };
 
     if (files.length === 0) {
       return { success: false, reason: "No code files found in repository" };

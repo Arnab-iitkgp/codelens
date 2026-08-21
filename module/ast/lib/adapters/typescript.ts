@@ -2,6 +2,7 @@ import type { Node as SyntaxNode, QueryCapture } from "web-tree-sitter";
 import * as ParserNS from "web-tree-sitter";
 import { LanguageAdapter, RawSymbol, RawImport, RawCall } from "./types";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TSQuery = (ParserNS as any).Query || (ParserNS as any).Parser.Query;
 
 export const typescriptAdapter: LanguageAdapter = {

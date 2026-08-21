@@ -4,7 +4,10 @@ import { getRepoFileContents } from "@/module/github/lib/github";
 import { indexCodebase, indexGraphSymbols } from "@/module/ai/lib/rag";
 import { getParser, tsLanguage } from "@/module/ast/lib/parser";
 import { typescriptAdapter } from "@/module/ast/lib/adapters/typescript";
+import { pythonAdapter } from "@/module/ast/lib/adapters/python";
 import { resolveGraphEdges } from "@/module/ast/lib/resolver";
+
+const ADAPTERS = [typescriptAdapter, pythonAdapter];
 
 export const indexRepo  = inngest.createFunction(
   {id:"index-repo", triggers: [{event:"repository.connected"}]},
@@ -38,9 +41,9 @@ export const indexRepo  = inngest.createFunction(
       });
 
       // Hybrid splitting (Phase 3D)
-      const isGraphSupported = (filename: string) => /\.(ts|tsx|js|jsx)$/.test(filename);
-      const graphFiles = files.filter(f => isGraphSupported(f.path));
-      const textFiles = files.filter(f => !isGraphSupported(f.path));
+      const getAdapter = (filename: string) => ADAPTERS.find(a => a.extensions.some(ext => filename.endsWith(ext)));
+      const graphFiles = files.filter(f => !!getAdapter(f.path));
+      const textFiles = files.filter(f => !getAdapter(f.path));
 
       await step.run("build-ast-graph", async () => {
         if (graphFiles.length === 0) return;
@@ -50,20 +53,24 @@ export const indexRepo  = inngest.createFunction(
         await prisma.edge.deleteMany({ where: { repositoryId: dbRepo.id } });
         await prisma.symbol.deleteMany({ where: { repositoryId: dbRepo.id } });
 
-        const parser = await getParser("tree-sitter-typescript.wasm");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const repoFacts: any[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newSymbols: any[] = [];
 
         for (const file of graphFiles) {
           try {
+            const adapter = getAdapter(file.path)!;
+            const { parser, language } = await getParser(adapter.getWasmFileName());
+            
             const tree = parser.parse(file.content);
             if (!tree) {
               console.warn(`[INDEXING] Failed to parse AST for ${file.path}`);
               continue;
             }
-            const symbols = typescriptAdapter.extractSymbols(tree, tsLanguage, file.content, file.path);
-            const imports = typescriptAdapter.extractImports(tree, tsLanguage, file.content, file.path);
-            const calls = typescriptAdapter.extractCalls(tree, tsLanguage, file.content, file.path);
+            const symbols = adapter.extractSymbols(tree, language, file.content, file.path);
+            const imports = adapter.extractImports(tree, language, file.content, file.path);
+            const calls = adapter.extractCalls(tree, language, file.content, file.path);
             
             repoFacts.push({ path: file.path, symbols, imports, calls });
 
@@ -74,7 +81,7 @@ export const indexRepo  = inngest.createFunction(
                 name: sym.name,
                 qualifiedName: sym.qualifiedName,
                 kind: sym.kind,
-                language: "typescript",
+                language: adapter.language,
                 startLine: sym.startLine,
                 endLine: sym.endLine,
                 signature: sym.signature || null,
@@ -133,6 +140,7 @@ export const indexRepo  = inngest.createFunction(
         }
 
         // Now map all edges
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newEdges: any[] = [];
         for (const edge of resolvedEdges) {
           const sourceId = symbolIdMap.get(`${edge.sourceSymbolPath}:${edge.sourceSymbolQualifiedName}`);

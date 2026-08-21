@@ -50,6 +50,7 @@ export const generateReview = inngest.createFunction(
         return {
           ...data,
           token: account.accessToken,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           architectureProfile: (repository as any)?.architectureProfile,
         };
       }
@@ -80,6 +81,7 @@ export const generateReview = inngest.createFunction(
         `[review] engine done: ${latencyMs}ms, retrieval=${meta.retrievalMode}, chunks=${meta.chunkCount}, provider=${meta.provider}`
       );
       return { output, structured, trace };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as { output: string, structured: ReviewOutput, trace: any };
 
     await step.run("post-comment", async () => {

@@ -1,5 +1,4 @@
 import prisma from "@/lib/db";
-// @ts-ignore
 import parseDiff from "parse-diff";
 import { retrieveContextForDiff, RetrievedChunk } from "@/module/ai/lib/rag";
 
@@ -18,7 +17,7 @@ export async function gatherReviewContext(
 
     for (const chunk of file.chunks) {
       const changedLines = chunk.changes
-        .map((c: any) => c.type === "add" ? c.ln : (c.type === "normal" ? c.ln2 : null))
+        .map((c: parseDiff.Change) => c.type === "add" ? c.ln : (c.type === "normal" ? c.ln2 : null))
         .filter(Boolean) as number[];
       
       if (changedLines.length === 0) continue;

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { generateObjectWithFallback } from "@/module/ai/lib/models";
-// @ts-ignore
 import parseDiff from "parse-diff";
 import { gatherReviewContext, InvestigatedChunk } from "./investigator";
 
@@ -256,7 +255,7 @@ function performExistenceChecks(
   return findings.filter(finding => {
     // 1. Check if the file is in the diff
     const fileDiff = parsed.find(
-      (file: any) => file.to === finding.file || file.from === finding.file
+      (file: parseDiff.File) => file.to === finding.file || file.from === finding.file
     );
     
     if (!fileDiff) {
@@ -265,8 +264,8 @@ function performExistenceChecks(
     }
     
     // 2. Check if the line number is within the modified hunks on the right side
-    const lineExists = fileDiff.chunks.some((chunk: any) => {
-      return chunk.changes.some((change: any) => {
+    const lineExists = fileDiff.chunks.some((chunk: parseDiff.Chunk) => {
+      return chunk.changes.some((change: parseDiff.Change) => {
         const rightLine = change.type === "normal" ? change.ln2 : (change.type === "add" ? change.ln : null);
         return rightLine === finding.startLine;
       });
