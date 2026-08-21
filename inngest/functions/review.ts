@@ -98,14 +98,20 @@ export const generateReview = inngest.createFunction(
       }
       if (repository) {
         console.log("Storing review in database for PR #" + prNumber);
+        
+        // Postgres does not support null bytes (\u0000) in text or json fields.
+        // LLMs occasionally hallucinate these characters, which causes a 22P05 fatal crash.
+        const sanitizedOutput = review.output.replace(/\u0000/g, "");
+        const sanitizedTrace = JSON.parse(JSON.stringify(review.trace).replace(/\u0000/g, ""));
+
         await prisma.review.create({
           data: {
             repositoryId: repository.id,
             prNumber,
             prTitle: title,
             prurl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
-            review: review.output,
-            traceData: review.trace,
+            review: sanitizedOutput,
+            traceData: sanitizedTrace,
             status: "completed",
           },
         });
