@@ -19,6 +19,7 @@ export const reviewSchema = z.object({
       claim: z.string().describe("The core issue found"),
       evidence: z.string().describe("Code snippets or logic proving the claim"),
       suggestion: z.string().describe("Actionable fix"),
+      confidence: z.string().optional().describe("Confidence score of the finding (e.g. 3/3 votes)"),
     })
   ).describe("Bugs, security concerns, code smells, or issues found"),
 });
@@ -41,6 +42,7 @@ export type RunReviewInput = {
   description: string;
   repoId: string;
   architectureProfile?: string | null;
+  reviewMode?: "fast" | "standard" | "full";
   options?: {
     // For eval / offline runs where the repo isn't indexed in Pinecone.
     skipRetrieval?: boolean;
@@ -116,16 +118,16 @@ Provide a comprehensive review using the provided JSON schema. Ensure all findin
 
 
 
-async function verifyFindings(
+async function verifySingleLens(
   input: RunReviewInput,
   chunks: InvestigatedChunk[],
-  initialFindings: ReviewOutput["findings"]
-): Promise<ReviewOutput["findings"]> {
-  if (initialFindings.length === 0) return [];
-
+  initialFindings: ReviewOutput["findings"],
+  lensFocus: string
+) {
   const contextBlock = formatContextBlock(chunks);
   const prompt = `You are a senior defense engineer. The following code issues were reported by an automated reviewer on this pull request.
 Your job is to ruthlessly scrutinize these findings. LLMs often hallucinate false positives, nitpicks, or issues that are not actually bugs. 
+${lensFocus}
 If a finding is a false positive, hallucinated, or a minor nitpick that a human wouldn't care about, mark it as "rejected".
 If it is a genuine, undeniable issue supported by the code, mark it as "verified".
 
@@ -144,18 +146,63 @@ Provide your verdicts using the JSON schema.`;
 
   try {
     const { object } = await generateObjectWithFallback(prompt, verifySchema);
-    
-    // Filter the initial findings based on the verdicts
-    const verifiedFindings = initialFindings.filter(finding => {
-      const match = object.verdicts.find(v => v.claim === finding.claim);
-      return match?.verdict === "verified";
-    });
-
-    return verifiedFindings;
+    return object.verdicts;
   } catch (error) {
-    console.error("[engine] Verification pass failed, returning original findings:", error);
-    return initialFindings; // Fallback to returning all if the verify pass crashes
+    console.error("[engine] Verification pass failed:", error);
+    return [];
   }
+}
+
+async function verifyFindings(
+  input: RunReviewInput,
+  chunks: InvestigatedChunk[],
+  initialFindings: ReviewOutput["findings"],
+  mode: "fast" | "standard" | "full" = "fast"
+): Promise<ReviewOutput["findings"]> {
+  if (initialFindings.length === 0) return [];
+
+  if (mode === "fast") {
+    // 1x Verify
+    const verdicts = await verifySingleLens(
+      input, chunks, initialFindings, 
+      "Evaluate the findings generally for correctness, security, and performance."
+    );
+    
+    return initialFindings.filter(finding => {
+      const match = verdicts.find(v => v.claim === finding.claim);
+      if (match?.verdict === "verified") {
+        finding.confidence = "1/1";
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // 3x Majority Vote (standard | full)
+  const [correctness, security, runtime] = await Promise.all([
+    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on logic errors, off-by-one errors, state management, and type safety. Reject style nits or theoretical issues."),
+    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on injection, auth bypass, race conditions, and data leakage. Reject general code quality nits."),
+    verifySingleLens(input, chunks, initialFindings, "Focus EXCLUSIVELY on performance, memory leaks, unhandled edge cases, and environment assumptions. Reject stylistic complaints.")
+  ]);
+
+  const verifiedFindings: ReviewOutput["findings"] = [];
+
+  for (const finding of initialFindings) {
+    let votes = 0;
+    if (correctness.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    if (security.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    if (runtime.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+
+    // Majority vote (2 out of 3)
+    if (votes >= 2) {
+      finding.confidence = `${votes}/3`;
+      verifiedFindings.push(finding);
+    } else {
+      console.log(`[engine] Dropped finding (only ${votes}/3 votes): ${finding.claim}`);
+    }
+  }
+
+  return verifiedFindings;
 }
 
 function formatReviewAsMarkdown(review: ReviewOutput): string {
@@ -182,7 +229,7 @@ function formatReviewAsMarkdown(review: ReviewOutput): string {
           ? "⚠️"
           : "💡";
       parts.push(
-        `### ${emoji} [${f.category}] \`${f.file}:${f.startLine}-${f.endLine}\``
+        `### ${emoji} [${f.category}] \`${f.file}:${f.startLine}-${f.endLine}\` ${f.confidence ? `(Confidence: ${f.confidence})` : ""}`
       );
       parts.push(`**Issue:** ${f.claim}`);
       parts.push(`**Evidence:** ${f.evidence}`);
@@ -238,8 +285,9 @@ export async function runReview(
   
   const { object } = await generateObjectWithFallback(prompt, reviewSchema);
   
-  // Phase 0.4: Adversarial Verify Pass (The Defense Attorney)
-  const verifiedFindings = await verifyFindings(input, chunks, object.findings);
+  // Phase 0.4 & 5.1: Adversarial Verify Pass (The Defense Attorney)
+  const reviewModeSetting = input.reviewMode ?? "fast";
+  const verifiedFindings = await verifyFindings(input, chunks, object.findings, reviewModeSetting);
   
   // Phase 0.5: Existence Checks (The Judge)
   const groundedFindings = performExistenceChecks(input.diff, verifiedFindings);

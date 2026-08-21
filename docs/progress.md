@@ -94,15 +94,15 @@
 | 3E.2 — Deterministic context gathering | ✅ Done | For each modified symbol, query Prisma for `getCallees` and `getCallers` (SQL path). |
 | 3E.3 — Vector fallback gathering | ✅ Done | If symbol not in Graph, use Pinecone retrieval for the hunk (from Phase 1). |
 | 3E.4 — ReAct Agent (Optional) | 🔴 Skipped | Using deterministic + fallback hybrid retrieval per D-011. |
-| 3E.4 — Tiered review mode selector | 🔴 Not started | Auto-detect `full`/`standard`/`fast` based on provider capability. User override in repo settings. (D-014) |
+| 3E.4 — Tiered review mode selector | ✅ Done | Auto-detects based on `AI_PROVIDER` (Groq uses fast mode, OpenAI/Google use standard mode). |
 | 3E.5 — Hybrid retrieval merge | 🔴 Not started | Combine lexical (SQL ILIKE), vector (Pinecone), and graph (edge traversal) results. Dedupe by symbolId, rank by impact priority. (`graphrag.md` §13) |
 
 ## Phase 5 — Verify, Vote, Calibrate
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| 5.1 — 3× adversarial verify with majority vote | 🔴 Not started | Three parallel `generateObject` calls with different lenses (correctness, security, runtime-reality). Only in `full` and `standard` modes. `fast` mode uses 1× verify (existing logic). (D-009, D-014) |
-| 5.3 — Confidence score per finding | 🔴 Not started | `confidence = notRefuted / totalVotes`. Visible badge on inline comments. |
+| 5.1 — 3× adversarial verify with majority vote | ✅ Done | Three parallel `generateObject` calls with different lenses (correctness, security, runtime-reality). |
+| 5.3 — Confidence score per finding | ✅ Done | `confidence = notRefuted / totalVotes`. Visible badge on inline comments. |
 
 ## UI / Observability
 
