@@ -266,20 +266,37 @@ function performExistenceChecks(
       return false;
     }
     
-    // 2. Check if the line number is within the modified hunks on the right side
-    const lineExists = fileDiff.chunks.some((chunk: parseDiff.Chunk) => {
-      return chunk.changes.some((change: parseDiff.Change) => {
-        const rightLine = change.type === "normal" ? change.ln2 : (change.type === "add" ? change.ln : null);
-        return rightLine === finding.startLine;
-      });
-    });
-    
-    if (!lineExists) {
-      console.warn(`[Existence Check] Dropped finding for ${finding.file}:${finding.startLine}: Line not in diff hunks.`);
-      return false;
+    // 2. Gather all valid right-side line numbers in the diff hunks
+    const validLines: number[] = [];
+    for (const chunk of fileDiff.chunks) {
+      for (const change of chunk.changes) {
+        if (change.type === "normal") validLines.push(change.ln2);
+        else if (change.type === "add") validLines.push(change.ln);
+      }
     }
     
-    return true;
+    if (validLines.length === 0) return false;
+    
+    if (validLines.includes(finding.startLine)) {
+      return true; // Exact match
+    }
+    
+    // 3. Snap to closest valid line to fix LLM line-number hallucinations
+    const closestLine = validLines.reduce((prev, curr) => 
+      Math.abs(curr - finding.startLine) < Math.abs(prev - finding.startLine) ? curr : prev
+    );
+    
+    // If the hallucinated line is within 25 lines of a diff hunk, snap it to the hunk.
+    // This allows findings on 'context' lines that fell just outside the 3-line patch window to survive!
+    if (Math.abs(closestLine - finding.startLine) <= 25) {
+      console.log(`[Existence Check] Snapping line ${finding.startLine} -> ${closestLine} for ${finding.file}`);
+      finding.startLine = closestLine;
+      finding.endLine = closestLine;
+      return true;
+    }
+    
+    console.warn(`[Existence Check] Dropped finding for ${finding.file}:${finding.startLine}: Too far from diff hunks.`);
+    return false;
   });
 }
 
