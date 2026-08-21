@@ -28,7 +28,7 @@ export type ReviewOutput = z.infer<typeof reviewSchema>;
 export const verifySchema = z.object({
   verdicts: z.array(
     z.object({
-      claim: z.string(),
+      id: z.string().describe("The ID of the finding being verified"),
       verdict: z.enum(["verified", "rejected"]),
       rationale: z.string().describe("Explanation of why this is a real issue or why it's a false positive")
     })
@@ -146,7 +146,7 @@ ${contextBlock}
 Reported Findings to Verify:
 ${JSON.stringify(initialFindings, null, 2)}
 
-Provide your verdicts using the JSON schema.`;
+Provide your verdicts using the JSON schema. Be sure to return the exact 'id' for each finding.`;
 
   try {
     const { object } = await generateObjectWithFallback(prompt, verifySchema);
@@ -165,15 +165,19 @@ async function verifyFindings(
 ): Promise<ReviewOutput["findings"]> {
   if (initialFindings.length === 0) return [];
 
+  // Assign temporary IDs to prevent string-matching failures when the LLM paraphrases the claim
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const findingsWithIds: any[] = initialFindings.map((f, i) => ({ id: `finding-${i}`, ...f }));
+
   if (mode === "fast") {
     // 1x Verify
     const verdicts = await verifySingleLens(
-      input, chunks, initialFindings, 
+      input, chunks, findingsWithIds, 
       "Evaluate the findings generally for correctness, security, and performance."
     );
     
-    return initialFindings.filter(finding => {
-      const match = verdicts.find(v => v.claim === finding.claim);
+    return initialFindings.filter((finding, i) => {
+      const match = verdicts.find(v => v.id === `finding-${i}`);
       if (match?.verdict === "verified") {
         finding.confidence = "1/1";
         return true;
@@ -187,18 +191,21 @@ async function verifyFindings(
   // Strict specialists (e.g. "Focus EXCLUSIVELY on security") will always reject correctness bugs, 
   // making a 2/3 majority mathematically impossible for standard bugs.
   const [reviewerA, reviewerB, reviewerC] = await Promise.all([
-    verifySingleLens(input, chunks, initialFindings, "Act as a Senior Frontend/Backend Engineer. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
-    verifySingleLens(input, chunks, initialFindings, "Act as a Principal Architect. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
-    verifySingleLens(input, chunks, initialFindings, "Act as a QA & Reliability Expert. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits.")
+    verifySingleLens(input, chunks, findingsWithIds, "Act as a Senior Frontend/Backend Engineer. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
+    verifySingleLens(input, chunks, findingsWithIds, "Act as a Principal Architect. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits."),
+    verifySingleLens(input, chunks, findingsWithIds, "Act as a QA & Reliability Expert. Evaluate all findings for correctness, security, and performance. If a finding is a genuine logic error, security flaw, or performance issue, verify it. Reject false positives and trivial style nits.")
   ]);
 
   const verifiedFindings: ReviewOutput["findings"] = [];
 
-  for (const finding of initialFindings) {
+  for (let i = 0; i < initialFindings.length; i++) {
+    const finding = initialFindings[i];
+    const findingId = `finding-${i}`;
     let votes = 0;
-    if (reviewerA.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
-    if (reviewerB.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
-    if (reviewerC.find(v => v.claim === finding.claim)?.verdict === "verified") votes++;
+    
+    if (reviewerA.find(v => v.id === findingId)?.verdict === "verified") votes++;
+    if (reviewerB.find(v => v.id === findingId)?.verdict === "verified") votes++;
+    if (reviewerC.find(v => v.id === findingId)?.verdict === "verified") votes++;
 
     // Majority vote (2 out of 3)
     if (votes >= 2) {
