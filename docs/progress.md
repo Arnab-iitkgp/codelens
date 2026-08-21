@@ -21,7 +21,7 @@
 | 0.4 — Adversarial verify pass | ✅ Done | Second LLM call inside `engine.ts` using `verifySchema` to refute findings. |
 | 0.5 — Existence checks | ✅ Done | Validate file and line number in PR's changed-files list using `parse-diff`. |
 | 0.6 — Repo profile stub | ✅ Done | Added `architectureProfile: String?` to Prisma and injected it into the engine prompt. |
-| 0.7 — Large PR chunking | 🔴 Not started | Split large diffs by file, review in parallel per-file-group, merge findings. Option B: walkthrough generated from structure scan while per-file reviews run in parallel. |
+| 0.7 — Large PR chunking | ✅ Done | Implemented `chunkDiff` in `engine.ts` to split diffs by `diff --git` and review chunks in parallel to avoid token limits. |
 
 ## Phase 0.5 — Eval Harness
 
@@ -50,7 +50,7 @@
 
 | Task | Status | Notes |
 | ---- | ------ | ----- |
-| F.1 — Token limit mitigation | 🔴 Not started | Address `max completion tokens reached` Groq API limit (chunking diffs, switching default models, or streaming). |
+| F.1 — Token limit mitigation | ✅ Done | Addressed `max completion tokens reached` Groq API limits by chunking large PR diffs directly in `runReview`. |
 
 ### 3A — Database & Schema
 

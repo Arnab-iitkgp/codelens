@@ -18,7 +18,7 @@ export const reviewSchema = z.object({
       claim: z.string().describe("The core issue found"),
       evidence: z.string().describe("Code snippets or logic proving the claim"),
       suggestion: z.string().describe("Actionable fix"),
-      confidence: z.string().optional().describe("Confidence score of the finding (e.g. 3/3 votes)"),
+      confidence: z.string().describe("Confidence score of the finding (e.g. 3/3 votes). Use empty string if not applicable."),
     })
   ).describe("Bugs, security concerns, code smells, or issues found"),
 });
@@ -280,43 +280,115 @@ function performExistenceChecks(
   });
 }
 
+function chunkDiff(diff: string, maxChars = 12000): string[] {
+  // Split by file (using lookahead for diff --git)
+  const fileDiffs = diff.split(/(?=^diff --git )/m).filter(d => d.trim().length > 0);
+  
+  const chunks: string[] = [];
+  let currentChunk = "";
+
+  for (const fileDiff of fileDiffs) {
+    if (currentChunk.length + fileDiff.length > maxChars && currentChunk.length > 0) {
+      chunks.push(currentChunk);
+      currentChunk = "";
+    }
+    currentChunk += fileDiff;
+  }
+  
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks.length > 0 ? chunks : [diff]; // Fallback to raw diff if splitting fails
+}
+
 export async function runReview(
   input: RunReviewInput
 ): Promise<RunReviewResult> {
   const startedAt = Date.now();
-  const { chunks, mode } = await retrieve(input);
-  const prompt = buildPrompt(input, chunks);
   
-  const { object } = await generateObjectWithFallback(prompt, reviewSchema);
+  // 1. Chunk the diff
+  const diffChunks = chunkDiff(input.diff, 12000);
+  console.log(`[engine] Diff split into ${diffChunks.length} chunks for processing.`);
+
+  const allInitialFindings: ReviewOutput["findings"] = [];
+  const allVerifiedFindings: ReviewOutput["findings"] = [];
+  const allChunks: InvestigatedChunk[] = [];
+  const summaries: string[] = [];
+  const walkthroughs: string[] = [];
+  const strengths: string[] = [];
+  let sequenceDiagram = "";
+  let overallRetrievalMode: RetrievalMode = "skipped";
+  let totalRetrievedChunks = 0;
   
-  // Clone the raw findings before they get filtered, for the Agent Trace UI
-  const rawInitialFindings = JSON.parse(JSON.stringify(object.findings));
-  
-  // Phase 0.4 & 5.1: Adversarial Verify Pass (The Defense Attorney)
+  // 2. Process each chunk in parallel
   const reviewModeSetting = input.reviewMode ?? "fast";
-  const verifiedFindings = await verifyFindings(input, chunks, object.findings, reviewModeSetting);
-  
-  // Phase 0.5: Existence Checks (The Judge)
-  const groundedFindings = performExistenceChecks(input.diff, verifiedFindings);
-  
-  object.findings = groundedFindings;
-  
-  const markdownOutput = formatReviewAsMarkdown(object);
+  const provider = process.env.AI_PROVIDER ?? "google";
+
+  const chunkPromises = diffChunks.map(async (diffChunk) => {
+    const { chunks, mode } = await retrieve({ ...input, diff: diffChunk });
+    if (mode === "diff") overallRetrievalMode = "diff";
+    if (mode === "fallback" && overallRetrievalMode === "skipped") overallRetrievalMode = "fallback";
+    
+    const prompt = buildPrompt({ ...input, diff: diffChunk }, chunks);
+    
+    const { object } = await generateObjectWithFallback(prompt, reviewSchema);
+    
+    const rawInitialFindings = JSON.parse(JSON.stringify(object.findings));
+    const verifiedFindings = await verifyFindings(input, chunks, object.findings, reviewModeSetting);
+    const groundedFindings = performExistenceChecks(diffChunk, verifiedFindings);
+    
+    return {
+      object,
+      groundedFindings,
+      rawInitialFindings,
+      retrievedChunks: chunks
+    };
+  });
+
+  const results = await Promise.all(chunkPromises);
+
+  // 3. Merge results
+  for (const res of results) {
+    allInitialFindings.push(...res.rawInitialFindings);
+    allVerifiedFindings.push(...res.groundedFindings);
+    allChunks.push(...res.retrievedChunks);
+    
+    if (res.object.summary) summaries.push(res.object.summary);
+    if (res.object.walkthrough) walkthroughs.push(res.object.walkthrough);
+    if (res.object.strengths) strengths.push(...res.object.strengths);
+    if (res.object.sequenceDiagram && !sequenceDiagram) sequenceDiagram = res.object.sequenceDiagram;
+    totalRetrievedChunks += res.retrievedChunks.length;
+  }
+
+  // Deduplicate strengths and retrieved chunks
+  const uniqueStrengths = Array.from(new Set(strengths));
+  const uniqueChunks = Array.from(new Map(allChunks.map(c => [c.content, c])).values());
+
+  const mergedObject: ReviewOutput = {
+    summary: summaries.join("\n\n---\n\n"),
+    walkthrough: walkthroughs.join("\n\n"),
+    sequenceDiagram,
+    strengths: uniqueStrengths,
+    findings: allVerifiedFindings
+  };
+
+  const markdownOutput = formatReviewAsMarkdown(mergedObject);
   
   const latencyMs = Date.now() - startedAt;
   return {
     output: markdownOutput,
-    structured: object,
+    structured: mergedObject,
     latencyMs,
     meta: {
-      retrievalMode: mode,
-      chunkCount: chunks.length,
-      provider: process.env.AI_PROVIDER ?? "google",
+      retrievalMode: overallRetrievalMode,
+      chunkCount: totalRetrievedChunks,
+      provider,
     },
     trace: {
-      chunks,
-      initialFindings: rawInitialFindings,
-      verifiedFindings: groundedFindings
+      chunks: uniqueChunks,
+      initialFindings: allInitialFindings,
+      verifiedFindings: allVerifiedFindings
     }
   };
 }

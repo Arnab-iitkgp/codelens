@@ -1,6 +1,24 @@
-import { google } from "@ai-sdk/google";
+import { google, createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai } from "@ai-sdk/openai";
 import { groq } from "@ai-sdk/groq";
+
+// ── API Key Rotation (Google) ──────────────────
+
+let currentGoogleKeyIndex = 0;
+
+function getNextGoogleProvider() {
+  const keysStr = process.env.GOOGLE_GENERATIVE_AI_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (keysStr) {
+    const keys = keysStr.split(",").map((k) => k.trim()).filter(Boolean);
+    if (keys.length > 0) {
+      const selectedKey = keys[currentGoogleKeyIndex % keys.length];
+      currentGoogleKeyIndex++;
+      // Create a custom google provider instance with the rotated key
+      return createGoogleGenerativeAI({ apiKey: selectedKey });
+    }
+  }
+  return google; // Fallback to default which uses GOOGLE_GENERATIVE_AI_API_KEY
+}
 
 // ── Language Model (for generateText / streamText) ──────────────────
 
@@ -20,7 +38,8 @@ export function getLanguageModel() {
       return groq(modelId);
     case "google":
     default:
-      return google(modelId);
+      const googleProvider = getNextGoogleProvider();
+      return googleProvider(modelId);
   }
 }
 
@@ -43,7 +62,8 @@ export function getEmbeddingModel() {
       return openai.embedding(modelId);
     case "google":
     default:
-      return google.textEmbeddingModel(modelId);
+      const googleProvider = getNextGoogleProvider();
+      return googleProvider.textEmbeddingModel(modelId);
   }
 }
 
@@ -56,9 +76,11 @@ export async function generateTextWithFallback(prompt: string) {
 
   // Seq of fallbacks to try in order
   const fallbackOrder: AIProvider[] = [primaryProvider];
-  if (primaryProvider !== "google") fallbackOrder.push("google");
-  if (primaryProvider !== "groq") fallbackOrder.push("groq");
-  if (primaryProvider !== "openai") fallbackOrder.push("openai");
+  if (process.env.DISABLE_CIRCUIT_BREAKER !== "true") {
+    if (primaryProvider !== "google") fallbackOrder.push("google");
+    if (primaryProvider !== "groq") fallbackOrder.push("groq");
+    if (primaryProvider !== "openai") fallbackOrder.push("openai");
+  }
 
   let lastError = null;
 
@@ -66,7 +88,8 @@ export async function generateTextWithFallback(prompt: string) {
     try {
       let model;
       if (provider === "google") {
-        model = google(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+        const googleProvider = getNextGoogleProvider();
+        model = googleProvider(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
       } else if (provider === "groq") {
         model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
       } else if (provider === "openai") {
@@ -99,9 +122,11 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
 
   // Seq of fallbacks to try in order
   const fallbackOrder: AIProvider[] = [primaryProvider];
-  if (primaryProvider !== "google") fallbackOrder.push("google");
-  if (primaryProvider !== "groq") fallbackOrder.push("groq");
-  if (primaryProvider !== "openai") fallbackOrder.push("openai");
+  if (process.env.DISABLE_CIRCUIT_BREAKER !== "true") {
+    if (primaryProvider !== "google") fallbackOrder.push("google");
+    if (primaryProvider !== "groq") fallbackOrder.push("groq");
+    if (primaryProvider !== "openai") fallbackOrder.push("openai");
+  }
 
   let lastError = null;
 
@@ -109,7 +134,8 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
     try {
       let model;
       if (provider === "google") {
-        model = google(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+        const googleProvider = getNextGoogleProvider();
+        model = googleProvider(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
       } else if (provider === "groq") {
         model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
       } else if (provider === "openai") {
