@@ -22,30 +22,23 @@ export const indexRepo  = inngest.createFunction(
         return repository;
       });
 
-      //fetch files
-      const files = await step.run("fetch-files",async()=>{
-        const account = await prisma.account.findFirst({
-          where:{
-            userId:userId,
-            providerId:"github"
-          }
-        })
-        if(!account?.accessToken){
-          throw new Error("No Github access token found")
-        }
-
-        const startFetch = Date.now();
-        const result = await getRepoFileContents(account.accessToken,owner,repo);
-        console.log(`[INDEXING] Fetched ${result.length} files in ${Date.now() - startFetch}ms`);
-        return result;
-      });
-
-      // Hybrid splitting (Phase 3D)
-      const getAdapter = (filename: string) => ADAPTERS.find(a => a.extensions.some(ext => filename.endsWith(ext)));
-      const graphFiles = files.filter(f => !!getAdapter(f.path));
-      const textFiles = files.filter(f => !getAdapter(f.path));
+      // Instead of passing massive arrays between Inngest steps, we fetch the files 
+      // locally inside each step. This keeps the data entirely in Vercel's RAM and 
+      // completely avoids Inngest's "output_too_large" error!
+      
+      const getAccountToken = async () => {
+        const account = await prisma.account.findFirst({ where: { userId, providerId: "github" } });
+        if (!account?.accessToken) throw new Error("No Github access token found");
+        return account.accessToken;
+      };
 
       await step.run("build-ast-graph", async () => {
+        const token = await getAccountToken();
+        const files = await getRepoFileContents(token, owner, repo);
+        
+        const getAdapter = (filename: string) => ADAPTERS.find(a => a.extensions.some(ext => filename.endsWith(ext)));
+        const graphFiles = files.filter(f => !!getAdapter(f.path));
+        
         if (graphFiles.length === 0) return;
         const startGraph = Date.now();
         
@@ -175,15 +168,25 @@ export const indexRepo  = inngest.createFunction(
         }
       });
 
-      await step.run("index-codebase",async ()=>{
+      await step.run("index-codebase", async () => {
+        const token = await getAccountToken();
+        const files = await getRepoFileContents(token, owner, repo);
+        
+        const getAdapter = (filename: string) => ADAPTERS.find(a => a.extensions.some(ext => filename.endsWith(ext)));
+        const textFiles = files.filter(f => !getAdapter(f.path));
+
         if (textFiles.length === 0) return;
         const startIndex = Date.now();
-        await indexCodebase(`${owner}/${repo}`,textFiles);
+        await indexCodebase(`${owner}/${repo}`, textFiles);
         console.log(`[INDEXING] Embedded ${textFiles.length} text files in ${Date.now() - startIndex}ms`);
       });
 
       // Store indexed file count on the repository
       await step.run("update-repo-metadata", async () => {
+        const token = await getAccountToken();
+        // Just fetch metadata to get total count, since we don't have the global 'files' array anymore
+        const files = await getRepoFileContents(token, owner, repo);
+        
         await prisma.repository.updateMany({
           where: { owner, name: repo },
           data: { 
@@ -193,6 +196,6 @@ export const indexRepo  = inngest.createFunction(
         });
       });
 
-      return{success:true,indexedFiles:files.length }
+      return { success: true }
   }
 );
