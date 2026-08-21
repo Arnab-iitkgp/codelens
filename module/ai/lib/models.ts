@@ -156,9 +156,11 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
         console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed for object generation. Successfully rerouted to '${provider}' with zero downtime.`);
       }
 
-      // LOG TOKEN USAGE
+      // LOG TOKEN USAGE (cast to any to bypass strict TS LanguageModelUsage limits)
       if (response.usage) {
-        console.log(`[AI Tokens] Provider: ${provider} | Input: ${response.usage.promptTokens} | Output: ${response.usage.completionTokens}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const usage = response.usage as any;
+        console.log(`[AI Tokens] Provider: ${provider} | Input: ${usage.promptTokens} | Output: ${usage.completionTokens}`);
       }
 
       return response;
