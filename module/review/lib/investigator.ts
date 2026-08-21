@@ -5,10 +5,21 @@ import { retrieveContextForDiff, RetrievedChunk } from "@/module/ai/lib/rag";
 export type InvestigatedChunk = RetrievedChunk & { type: "graph" | "vector" };
 
 export async function gatherReviewContext(
-  repoId: string,
+  repoFullName: string,
   diffText: string
 ): Promise<InvestigatedChunk[]> {
   const contextChunks: InvestigatedChunk[] = [];
+  
+  // Resolve the database CUID for the Postgres graph tables
+  const [owner, name] = repoFullName.split("/");
+  let dbRepoId = repoFullName; // Fallback for eval/test
+  if (owner && name) {
+    const repository = await prisma.repository.findFirst({ where: { owner, name } });
+    if (repository) {
+      dbRepoId = repository.id;
+    }
+  }
+
   const parsed = parseDiff(diffText);
   
   // 1. Deterministic Graph Traversal
@@ -23,7 +34,7 @@ export async function gatherReviewContext(
       if (changedLines.length === 0) continue;
       
       const fileSymbols = await prisma.symbol.findMany({
-        where: { repositoryId: repoId, path: file.to }
+        where: { repositoryId: dbRepoId, path: file.to }
       });
       
       const matchedSymbols = fileSymbols.filter(sym => 
@@ -34,12 +45,12 @@ export async function gatherReviewContext(
 
       for (const sym of uniqueSymbols) {
         const callers = await prisma.edge.findMany({
-          where: { repositoryId: repoId, targetSymbolId: sym.id },
+          where: { repositoryId: dbRepoId, targetSymbolId: sym.id },
           include: { sourceSymbol: true }
         });
         
         const callees = await prisma.edge.findMany({
-          where: { repositoryId: repoId, sourceSymbolId: sym.id },
+          where: { repositoryId: dbRepoId, sourceSymbolId: sym.id },
           include: { targetSymbol: true }
         });
         
@@ -69,7 +80,8 @@ export async function gatherReviewContext(
   // If we already have dense graph nodes (like TS files), we don't want to pollute 
   // the context window with massive unstructured Pinecone text dumps.
   if (contextChunks.length === 0) {
-    const fallbackChunks = await retrieveContextForDiff(diffText, repoId);
+    // Pinecone uses the raw 'owner/repo' string namespace, not the CUID
+    const fallbackChunks = await retrieveContextForDiff(diffText, repoFullName);
     for (const fallback of fallbackChunks) {
       contextChunks.push({
         path: fallback.path,
