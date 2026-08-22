@@ -21,6 +21,20 @@ a new architectural choice, add a new entry at the top (newest first) with:
 
 ---
 
+## D-015 · Split-Brain AI Architecture with 4-Layer Circuit Breaker
+- **Date:** 2026-08-23
+- **Status:** accepted
+- **Context:** We need a way to route fast, bulk code reviews (The Critic) to cheap models (like Groq or Flash) while routing complex, single-file reasoning tasks (The Auto-Fix Agent) to expensive, highly-intelligent models (like Vertex AI Pro). Furthermore, enterprise users on GCP Vertex AI need a resilient fallback chain if GCP goes down.
+- **Decision:** Implement a Split-Brain Provider Routing system gated by `GCP_ENABLED=true`. 
+  1. **Agent Separation:** The Auto-Fix Agent explicitly requests `AI_AGENT_MODEL_ID` (defaulting to Pro) while the Review Engine uses `AI_MODEL_ID`. 
+  2. **4-Layer Fallback:** If `GCP_ENABLED=true` and `AI_PROVIDER=google`, the circuit breaker executes a 4-step failover with zero downtime: (1) GCP Vertex AI → (2) Standard Gemini API Keys (`forceStandard=true`) → (3) Groq → (4) OpenAI. 
+  3. **Mixed Environments:** If `AI_PROVIDER=groq` and `GCP_ENABLED=true`, bulk reviews go to Groq, but the system still safely routes the Auto-Fix Agent to Vertex AI. 
+- **Alternatives considered:**
+  - Hardcoding Vertex AI in the Agent: Rejected because it breaks local dev for non-enterprise users.
+  - Using a single provider for both engine and agent: Rejected because Pro models cost too much for bulk scanning, and Flash models hallucinate during strict agentic coding.
+- **Consequences:** The system is enterprise-ready. Developers can configure cheap models for scanning and Pro models for fixing. The circuit breaker guarantees high availability even if Vertex AI quotas are exhausted.
+
+---
 ## D-014 · Tiered review modes for API rate limits
 - **Date:** 2026-08-21
 - **Status:** accepted

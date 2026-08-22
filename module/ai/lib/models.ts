@@ -4,44 +4,60 @@ import { groq } from "@ai-sdk/groq";
 
 // ── API Key Rotation (Google) ──────────────────
 
+import { createVertex } from '@ai-sdk/google-vertex';
+
 let currentGoogleKeyIndex = Math.floor(Math.random() * 1000);
 
-function getNextGoogleProvider() {
+function getNextGoogleProvider(forceStandard = false) {
+  // 1. GCP Vertex AI (Enterprise Priority)
+  if (!forceStandard && process.env.GCP_ENABLED === "true" && process.env.GOOGLE_VERTEX_CREDENTIALS_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_VERTEX_CREDENTIALS_JSON);
+      return createVertex({
+        project: credentials.project_id,
+        location: 'global',
+        googleAuthOptions: { credentials },
+      });
+    } catch (e) {
+      console.error("[Models] Failed to parse GOOGLE_VERTEX_CREDENTIALS_JSON, falling back to API keys.", e);
+    }
+  }
+
+  // 2. Standard API Keys (Fallback)
   const keysStr = process.env.GOOGLE_GENERATIVE_AI_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (keysStr) {
     const keys = keysStr.split(",").map((k) => k.trim()).filter(Boolean);
     if (keys.length > 0) {
-      // Use randomness to distribute load across keys in Serverless environments
-      // where global state doesn't persist across parallel step invocations.
       const selectedKey = keys[currentGoogleKeyIndex % keys.length];
       currentGoogleKeyIndex++;
-      // Create a custom google provider instance with the rotated key
       return createGoogleGenerativeAI({ apiKey: selectedKey });
     }
   }
-  return google; // Fallback to default which uses GOOGLE_GENERATIVE_AI_API_KEY
+  return google; // Default fallback
 }
 
 // ── Language Model (for generateText / streamText) ──────────────────
 
-type AIProvider = "google" | "openai" | "groq";
+type AIProvider = "google-vertex" | "google" | "openai" | "groq";
 
 const DEFAULT_PROVIDER: AIProvider = "google";
 const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite-preview";
 
-export function getLanguageModel() {
+export function getLanguageModel(modelIdOverride?: string) {
   const provider = (process.env.AI_PROVIDER as AIProvider) || DEFAULT_PROVIDER;
-  const modelId = process.env.AI_MODEL_ID || DEFAULT_MODEL_ID;
+  const modelId = modelIdOverride || process.env.AI_MODEL_ID || DEFAULT_MODEL_ID;
 
   switch (provider) {
     case "openai":
       return openai(modelId);
     case "groq":
       return groq(modelId);
+    case "google-vertex":
+      return getNextGoogleProvider(false)(modelId);
     case "google":
     default:
-      const googleProvider = getNextGoogleProvider();
-      return googleProvider(modelId);
+      // If AI_PROVIDER=google, but GCP_ENABLED=true, we still try Vertex first.
+      return getNextGoogleProvider(false)(modelId);
   }
 }
 
@@ -64,7 +80,7 @@ export function getEmbeddingModel() {
       return openai.embedding(modelId);
     case "google":
     default:
-      const googleProvider = getNextGoogleProvider();
+      const googleProvider = getNextGoogleProvider(false);
       return googleProvider.textEmbeddingModel(modelId);
   }
 }
@@ -79,19 +95,26 @@ export async function generateTextWithFallback(prompt: string) {
   // Seq of fallbacks to try in order
   const fallbackOrder: AIProvider[] = [primaryProvider];
   if (process.env.DISABLE_CIRCUIT_BREAKER !== "true") {
+    // If primary is google, we add google-standard explicit fallback before groq
+    if (primaryProvider === "google" && process.env.GCP_ENABLED === "true") {
+      fallbackOrder.push("google"); // We will force standard in the loop
+    }
     if (primaryProvider !== "google") fallbackOrder.push("google");
     if (primaryProvider !== "groq") fallbackOrder.push("groq");
     if (primaryProvider !== "openai") fallbackOrder.push("openai");
   }
 
   let lastError = null;
+  let hasTriedVertex = false;
 
   for (const provider of fallbackOrder) {
     try {
       let model;
-      if (provider === "google") {
-        const googleProvider = getNextGoogleProvider();
+      if (provider === "google" || provider === "google-vertex") {
+        const isStandardFallback = provider === "google" && hasTriedVertex;
+        const googleProvider = getNextGoogleProvider(isStandardFallback);
         model = googleProvider(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+        if (!isStandardFallback) hasTriedVertex = true;
       } else if (provider === "groq") {
         model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
       } else if (provider === "openai") {
@@ -106,7 +129,7 @@ export async function generateTextWithFallback(prompt: string) {
       });
 
       if (provider !== primaryProvider) {
-        console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed. Successfully rerouted to '${provider}' with zero downtime.`);
+        console.warn(`[AI Circuit Breaker] Successfully rerouted to fallback '${provider}' with zero downtime.`);
       }
 
       return response;
@@ -125,19 +148,26 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
   // Seq of fallbacks to try in order
   const fallbackOrder: AIProvider[] = [primaryProvider];
   if (process.env.DISABLE_CIRCUIT_BREAKER !== "true") {
+    // If primary is google, we add google-standard explicit fallback before groq
+    if (primaryProvider === "google" && process.env.GCP_ENABLED === "true") {
+      fallbackOrder.push("google"); // We will force standard in the loop
+    }
     if (primaryProvider !== "google") fallbackOrder.push("google");
     if (primaryProvider !== "groq") fallbackOrder.push("groq");
     if (primaryProvider !== "openai") fallbackOrder.push("openai");
   }
 
   let lastError = null;
+  let hasTriedVertex = false;
 
   for (const provider of fallbackOrder) {
     try {
       let model;
-      if (provider === "google") {
-        const googleProvider = getNextGoogleProvider();
+      if (provider === "google" || provider === "google-vertex") {
+        const isStandardFallback = provider === "google" && hasTriedVertex;
+        const googleProvider = getNextGoogleProvider(isStandardFallback);
         model = googleProvider(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "gemini-3.1-flash-lite-preview");
+        if (!isStandardFallback) hasTriedVertex = true;
       } else if (provider === "groq") {
         model = groq(provider === primaryProvider && process.env.AI_MODEL_ID ? process.env.AI_MODEL_ID : "llama-3.1-8b-instant");
       } else if (provider === "openai") {
@@ -153,12 +183,10 @@ export async function generateObjectWithFallback<T>(prompt: string, schema: z.Zo
       });
 
       if (provider !== primaryProvider) {
-        console.warn(`[AI Circuit Breaker] Primary provider '${primaryProvider}' failed for object generation. Successfully rerouted to '${provider}' with zero downtime.`);
+        console.warn(`[AI Circuit Breaker] Successfully rerouted to fallback '${provider}' with zero downtime.`);
       }
 
-      // LOG TOKEN USAGE (cast to any to bypass strict TS LanguageModelUsage limits)
       if (response.usage) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const usage = response.usage as any;
         console.log(`[AI Tokens] Provider: ${provider} | Input: ${usage.promptTokens} | Output: ${usage.completionTokens}`);
       }
