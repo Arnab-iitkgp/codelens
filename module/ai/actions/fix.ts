@@ -43,7 +43,10 @@ export async function executeAutoFix(
     );
 
     if (!agentResult.success || !agentResult.patch) {
-      throw new Error("Agent failed to generate a patch.");
+      console.error(`[Auto-Fix] ❌ Agent failed to generate a patch. (Model: ${agentResult.modelUsed})`);
+      console.error("[Auto-Fix] 🧠 Final Thoughts:\n", agentResult.agentThoughts);
+      console.error("[Auto-Fix] 📋 Final Plan:\n", agentResult.plan);
+      throw new Error(`Agent failed to generate a patch. (Model: ${agentResult.modelUsed}) Last thoughts: ${agentResult.agentThoughts}`);
     }
 
     // 3. Post the fix as a native GitHub Suggestion Block!

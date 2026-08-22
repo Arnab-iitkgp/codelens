@@ -13,7 +13,7 @@ function getAgentModel() {
   console.log(`[Agent] Booting agent using model: ${agentModelId} (GCP_ENABLED=${process.env.GCP_ENABLED || "false"})`);
   
   // getLanguageModel now automatically handles GCP_ENABLED vs API Key routing system-wide
-  return getLanguageModel(agentModelId);
+  return { model: getLanguageModel(agentModelId), modelId: agentModelId };
 }
 
 /**
@@ -27,7 +27,7 @@ export async function runAgenticFixer(
   bugFinding: string, // the JSON string of the finding
   initialFilePath: string
 ) {
-  const model = getAgentModel();
+  const { model, modelId } = getAgentModel();
   const octokit = new Octokit({ auth: githubToken });
 
   console.log(`[Agent] Starting ReAct loop for bug in ${initialFilePath}`);
@@ -153,6 +153,7 @@ You MUST follow this exact sequence:
     success: finalPatch !== "",
     plan: finalPlan,
     patch: finalPatch,
-    agentThoughts: result.text
+    agentThoughts: result.text,
+    modelUsed: modelId
   };
 }
