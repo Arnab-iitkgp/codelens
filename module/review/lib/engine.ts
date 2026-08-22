@@ -18,7 +18,7 @@ export const reviewSchema = z.object({
       claim: z.string().describe("The core issue found"),
       evidence: z.string().describe("Code snippets or logic proving the claim"),
       suggestion: z.string().describe("Actionable fix"),
-      affects: z.array(z.string()).optional().describe("A list of file paths (e.g. 'src/utils.ts') that call this code and will break because they weren't updated in the diff. Leave empty if none."),
+      affects: z.array(z.string()).describe("A list of file paths (e.g. 'src/utils.ts') that call this code and will break because they weren't updated in the diff. Return an empty array [] if none."),
       confidence: z.string().describe("Confidence score of the finding (e.g. 3/3 votes). Use empty string if not applicable."),
     })
   ).describe("Bugs, security concerns, code smells, or issues found"),
