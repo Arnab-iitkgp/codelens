@@ -18,6 +18,7 @@ export const reviewSchema = z.object({
       claim: z.string().describe("The core issue found"),
       evidence: z.string().describe("Code snippets or logic proving the claim"),
       suggestion: z.string().describe("Actionable fix"),
+      affects: z.array(z.string()).optional().describe("A list of file paths (e.g. 'src/utils.ts') that call this code and will break because they weren't updated in the diff. Leave empty if none."),
       confidence: z.string().describe("Confidence score of the finding (e.g. 3/3 votes). Use empty string if not applicable."),
     })
   ).describe("Bugs, security concerns, code smells, or issues found"),
@@ -117,7 +118,9 @@ Code Changes:
 ${input.diff}
 \`\`\`
 
-Provide a comprehensive review using the provided JSON schema. Ensure all findings include specific file paths and line numbers that match the diff.`;
+Provide a comprehensive review using the provided JSON schema. Ensure all findings include specific file paths and line numbers that match the diff.
+If the PR modifies a function's signature, return type, or behavior, you MUST check the provided [CALLERS] context. 
+If those callers rely on the old behavior and were not updated in the PR diff, you MUST flag it as a bug and list the broken callers in the 'affects' array!`;
 }
 
 
@@ -247,7 +250,11 @@ function formatReviewAsMarkdown(review: ReviewOutput): string {
       );
       parts.push(`**Issue:** ${f.claim}`);
       parts.push(`**Evidence:** ${f.evidence}`);
-      parts.push(`**Suggestion:** ${f.suggestion}\n`);
+      parts.push(`**Suggestion:** ${f.suggestion}`);
+      if (f.affects && f.affects.length > 0) {
+        parts.push(`💥 **Blast Radius (Regression Risk):**\n${f.affects.map(a => `- \`${a}\``).join("\n")}`);
+      }
+      parts.push(""); // Add an empty line between findings
     }
   } else {
     parts.push(`## Findings\nNo significant issues found! 🎉\n`);
