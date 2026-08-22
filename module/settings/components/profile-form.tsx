@@ -60,7 +60,7 @@ export function ProfileForm() {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full bg-white dark:bg-[#121214] border-zinc-200 dark:border-white/[0.05] shadow-sm">
       <CardHeader>
         <CardTitle>Profile</CardTitle>
         <CardDescription>
@@ -77,6 +77,7 @@ export function ProfileForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
+              className="bg-transparent border-zinc-200 dark:border-white/[0.1] focus-visible:ring-1 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300"
             />
           </div>
 
@@ -88,12 +89,13 @@ export function ProfileForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
+              className="bg-transparent border-zinc-200 dark:border-white/[0.1] focus-visible:ring-1 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300"
             />
           </div>
 
           <Button
             type="submit"
-            className="w-full"
+            className="w-full bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-all font-medium"
             disabled={updateMutation.isPending}
           >
             {updateMutation.isPending ? "Saving..." : "Save Changes"}

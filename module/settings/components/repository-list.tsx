@@ -80,7 +80,7 @@ export function RepositoryList() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="bg-white dark:bg-[#121214] border-zinc-200 dark:border-white/[0.05] shadow-sm">
         <CardHeader>
           <CardTitle>Connected Repositories</CardTitle>
           <CardDescription>
@@ -98,7 +98,7 @@ export function RepositoryList() {
 
   return (
     <>
-      <Card>
+      <Card className="bg-white dark:bg-[#121214] border-zinc-200 dark:border-white/[0.05] shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Connected Repositories</CardTitle>
