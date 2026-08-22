@@ -1,4 +1,4 @@
-import { reviewPullRequest } from "@/module/ai/actions";
+import { reviewPullRequest, triggerReindex } from "@/module/ai/actions";
 import { NextResponse,NextRequest } from "next/server";
 
 export async function POST (req:NextRequest){
@@ -10,8 +10,26 @@ export async function POST (req:NextRequest){
             return NextResponse.json({msg:"pong"},{status:200})
         }
 
-        if(event!=="pull_request"){
+        if(event!=="pull_request" && event!=="push"){
             return NextResponse.json({msg:"event ignored"},{status:200})
+        }
+
+        if (event === "push") {
+            const ref = body.ref;
+            const repo = body.repository.full_name;
+            const defaultBranch = body.repository.default_branch;
+            
+            if (ref === `refs/heads/${defaultBranch}`) {
+                const [owner, repoName] = repo.split("/");
+                
+                try {
+                    await triggerReindex(owner, repoName);
+                    console.log(`Successfully queued re-index for repository ${repoName} after push to ${defaultBranch}`);
+                } catch (error) {
+                    console.error(`Failed to queue re-index for repository ${repoName}:`, error);
+                }
+            }
+            return NextResponse.json({msg:"push event processed"},{status:200});
         }
 
         if(event==="pull_request"){

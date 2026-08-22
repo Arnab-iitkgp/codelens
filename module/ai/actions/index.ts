@@ -81,3 +81,23 @@ export async function reviewPullRequest(owner:string,repo:string,prNumber:number
         }
     }    
 }
+
+export async function triggerReindex(owner: string, repo: string) {
+    const repository = await prisma.repository.findFirst({
+        where: { owner, name: repo }
+    });
+    
+    if (repository) {
+        await inngest.send({
+            name: "repository.connected",
+            data: {
+                owner,
+                repo,
+                userId: repository.userId
+            }
+        });
+        return { success: true, message: `Re-indexing queued for ${owner}/${repo}` };
+    }
+    
+    return { success: false, message: "Repository not found in database." };
+}
