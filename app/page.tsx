@@ -24,9 +24,7 @@ export default async function Home() {
           <div className="flex h-16 items-center justify-between relative">
             {/* Left: Logo */}
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center border border-zinc-900 dark:border-white/10 bg-zinc-900 dark:bg-white/5 rounded-md text-white font-bold text-sm">
-                CL
-              </div>
+              <img src="/codelens-logo.png" alt="CodeLens" className="h-8 w-8 object-contain" />
               <span className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">CodeLens</span>
             </div>
             
@@ -149,8 +147,8 @@ export default async function Home() {
               {/* 1. Bot Comment */}
               <div className="flex gap-4">
                 <div className="shrink-0 mt-1 hidden sm:block z-10">
-                  <div className="w-8 h-8 rounded bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xs shadow-sm ring-4 ring-[#fafafa] dark:ring-[#18181b]">
-                    CL
+                  <div className="w-8 h-8 rounded-md bg-[#09090b] flex items-center justify-center shadow-sm ring-4 ring-[#fafafa] dark:ring-[#18181b] overflow-hidden">
+                    <img src="/codelens-logo.png" alt="CodeLens" className="h-6 w-6 object-contain" />
                   </div>
                 </div>
                 
@@ -461,7 +459,9 @@ export default async function Home() {
                   <div className="w-6 flex flex-col items-center relative h-full">
                     <div className="absolute top-2 bottom-6 w-px bg-zinc-200 dark:bg-zinc-800"></div>
                     {/* Bot Avatar */}
-                    <div className="w-5 h-5 rounded-full bg-[#18181B] dark:bg-zinc-100 z-10 flex items-center justify-center border-2 border-[#F9F9F8] dark:border-[#18181b] shadow-sm"><Bot size={10} className="text-white dark:text-zinc-900"/></div>
+                    <div className="w-5 h-5 rounded-full bg-[#09090b] z-10 flex items-center justify-center border-2 border-[#F9F9F8] dark:border-[#18181b] shadow-sm overflow-hidden">
+                      <img src="/codelens-logo.png" alt="CodeLens" className="w-full h-full object-contain p-0.5" />
+                    </div>
                     {/* User Avatar */}
                     <div className="w-5 h-5 rounded-full bg-zinc-300 dark:bg-zinc-700 z-10 mt-auto mb-4 border-2 border-[#F9F9F8] dark:border-[#18181b] overflow-hidden">
                       <img src="https://github.com/shadcn.png" alt="Avatar" className="w-full h-full object-cover grayscale opacity-80" />
@@ -525,9 +525,7 @@ export default async function Home() {
           
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-               <div className="flex h-7 w-7 items-center justify-center border border-white/10 dark:border-black/10 bg-white/5 dark:bg-black/5 rounded-[6px] text-white dark:text-zinc-900 font-bold text-[11px] shadow-sm">
-                 CL
-               </div>
+               <img src="/codelens-logo.png" alt="CodeLens" className="h-8 w-8 object-contain" />
                <span className="font-bold text-[18px] text-white dark:text-zinc-900 tracking-tight">CodeLens</span>
             </div>
             <p className="text-[14px] text-zinc-400 dark:text-zinc-600 max-w-[280px] leading-relaxed">
