@@ -50,18 +50,18 @@ export const AppSidebar = () => {
     pathname === url || pathname.startsWith(url + "/")
 
   return (
-    <Sidebar collapsible="icon" className="border-r bg-background">
+    <Sidebar collapsible="icon" className="border-r border-zinc-200 dark:border-white/[0.05] bg-[#fafafa] dark:bg-[#09090b]">
       {/* Top Branding */}
-      <SidebarHeader className="h-14 flex px-4 border-b">
-        <div className="flex items-center gap-3">
+      <SidebarHeader className="h-14 flex px-4 border-b border-zinc-200 dark:border-white/[0.05]">
+        <div className="flex items-center gap-2.5 px-2">
           <img 
             src="/codelens-logo.png" 
             alt="CodeLens" 
-            className="h-12 w-13"
+            className="h-8 w-8 object-contain"
           />
           <div className="leading-tight">
-            <p className="text-sm font-semibold">CodeLens</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm font-semibold tracking-tight">CodeLens</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
               AI Reviewer
             </p>
           </div>
@@ -69,16 +69,17 @@ export const AppSidebar = () => {
       </SidebarHeader>
 
       {/* Navigation */}
-      <SidebarContent className="pt-6">
-        <SidebarMenu>
+      <SidebarContent className="pt-6 px-2">
+        <SidebarMenu className="gap-1.5">
           {navigationItems.map((item) => (
             <SidebarMenuItem key={item.url}>
               <SidebarMenuButton
                 asChild
                 isActive={isActive(item.url)}
+                className="hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors"
               >
-                <Link href={item.url}>
-                  <item.icon className="h-6 w-6" />
+                <Link href={item.url} className="flex items-center gap-3 text-sm font-medium">
+                  <item.icon className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
@@ -88,7 +89,7 @@ export const AppSidebar = () => {
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t p-2">
+      <SidebarFooter className="border-t border-zinc-200 dark:border-white/[0.05] p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
