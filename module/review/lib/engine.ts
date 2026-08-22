@@ -307,8 +307,29 @@ function performExistenceChecks(
   });
 }
 
+function filterNoiseFilesFromDiff(diff: string): string {
+  const fileDiffs = diff.split(/(?=^diff --git )/m);
+  
+  const noisyExtensions = /\.(svg|png|jpg|jpeg|gif|ico|pdf|zip|tar|gz|mp4|webm|woff|woff2|ttf|eot)$/i;
+  const noisyFiles = /package-lock\.json|bun\.lockb?|yarn\.lock|pnpm-lock\.yaml/i;
+  const minified = /\.min\.(js|css)$/i;
+
+  const filteredDiffs = fileDiffs.filter(fileDiff => {
+    const match = fileDiff.match(/^diff --git a\/(.+?) b\//m);
+    if (!match) return true; // Keep if we can't parse the header
+    
+    const filename = match[1];
+    if (noisyExtensions.test(filename)) return false;
+    if (noisyFiles.test(filename)) return false;
+    if (minified.test(filename)) return false;
+    
+    return true;
+  });
+
+  return filteredDiffs.join("");
+}
+
 function chunkDiff(diff: string, maxChars = 12000): string[] {
-  // Split by file (using lookahead for diff --git)
   const fileDiffs = diff.split(/(?=^diff --git )/m).filter(d => d.trim().length > 0);
   
   const chunks: string[] = [];
@@ -334,8 +355,11 @@ export async function runReview(
 ): Promise<RunReviewResult> {
   const startedAt = Date.now();
   
-  // 1. Chunk the diff
-  const diffChunks = chunkDiff(input.diff, 12000);
+  // 1. Filter out noise files (lockfiles, SVGs, minified bundles) before anything else
+  const filteredDiff = filterNoiseFilesFromDiff(input.diff);
+
+  // 2. Chunk the filtered diff
+  const diffChunks = chunkDiff(filteredDiff, 12000);
   console.log(`[engine] Diff split into ${diffChunks.length} chunks for processing.`);
 
   const allInitialFindings: ReviewOutput["findings"] = [];
