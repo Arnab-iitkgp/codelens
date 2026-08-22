@@ -165,6 +165,16 @@
 - Excluded test fixture directories from the core build to ensure flawless Next.js production builds.
 - **Next session:** Verify extraction natively on a Python repository.
 
+### 2026-08-23 — Auto-Fix Agent & Split-Brain Architecture
+- Designed and integrated the **Agentic Auto-Fix Pipeline** for autonomous bug remediation.
+- Built the `AutoFixButton` client component and injected it into the Agent Trace UI dashboard.
+- Extended GitHub webhook handling in `route.ts` to support `@codelens fix` mentions on PR inline comments (handling multi-line range selections flawlessly).
+- Implemented **D-015: Split-Brain Provider Routing**.
+- Centralized Vertex AI (GCP) configurations globally in `models.ts` with a resilient 4-Layer Circuit Breaker (`google-vertex` → `google-standard` → `groq` → `openai`).
+- Configured the Auto-Fix Agent to utilize high-intelligence Pro models (`AI_AGENT_MODEL_ID`), keeping bulk reviews fast and cheap.
+- Fixed critical edge-case bugs in OAuth parsing and Webhook line ranges.
+- **Next session:** Focus on running the Eval Harness, or finalizing the Hybrid Retrieval Merge (Phase 3E.5).
+
 ---
 
 ## Blockers / Open Questions
