@@ -76,27 +76,49 @@ export async function gatherReviewContext(
     }
   }
 
-  // 2. Vector Fallback (ONLY if Graph traversal found nothing)
-  // If we already have dense graph nodes (like TS files), we don't want to pollute 
-  // the context window with massive unstructured Pinecone text dumps.
-  if (contextChunks.length === 0) {
-    // Pinecone uses the raw 'owner/repo' string namespace, not the CUID
-    const fallbackChunks = await retrieveContextForDiff(diffText, repoFullName);
-    for (const fallback of fallbackChunks) {
-      contextChunks.push({
-        path: fallback.path,
-        content: `[VECTOR MATCH]\n${fallback.content}`,
-        score: fallback.score,
-        type: "vector"
-      });
+  // 2. Vector Retrieval (Always fetch, but merge via budget)
+  // Pinecone uses the raw 'owner/repo' string namespace, not the CUID
+  const vectorChunks: InvestigatedChunk[] = [];
+  const fallbackChunks = await retrieveContextForDiff(diffText, repoFullName);
+  for (const fallback of fallbackChunks) {
+    vectorChunks.push({
+      path: fallback.path,
+      content: `[VECTOR MATCH]\n${fallback.content}`,
+      score: fallback.score,
+      type: "vector"
+    });
+  }
+
+  // 3. Hybrid Merge & Token Budget Enforcer
+  // To prevent LLM context limits (e.g. Groq 8k), we strictly budget the context payload.
+  const MAX_CONTEXT_CHARS = 6000;
+  let currentChars = 0;
+  const finalChunks: InvestigatedChunk[] = [];
+  const seenContent = new Set<string>();
+
+  const tryAddChunk = (chunk: InvestigatedChunk) => {
+    if (seenContent.has(chunk.content)) return true; // Already added, skip
+    // If adding this exceeds the budget (and we already have at least 1 chunk), stop
+    if (currentChars + chunk.content.length > MAX_CONTEXT_CHARS && currentChars > 0) {
+      return false; 
     }
-  }
+    finalChunks.push(chunk);
+    seenContent.add(chunk.content);
+    currentChars += chunk.content.length;
+    return true;
+  };
 
-  // Deduplicate and cap
-  const uniqueChunks = new Map<string, InvestigatedChunk>();
+  // Priority 1: Graph Traversal (Highest Signal)
   for (const chunk of contextChunks) {
-    uniqueChunks.set(chunk.content, chunk);
+    if (!tryAddChunk(chunk)) break;
   }
 
-  return Array.from(uniqueChunks.values()).sort((a, b) => b.score - a.score).slice(0, 15);
+  // Priority 2: Vector Fallback (Semantic Match)
+  // Sort vector chunks by score descending to get best semantic matches first
+  vectorChunks.sort((a, b) => b.score - a.score);
+  for (const chunk of vectorChunks) {
+    if (!tryAddChunk(chunk)) break;
+  }
+
+  return finalChunks;
 }
