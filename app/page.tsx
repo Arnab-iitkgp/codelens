@@ -89,12 +89,21 @@ export default async function Home() {
             </p>
             
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/login">
-                <Button size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
-                  Connect with GitHub
-                  <Github className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" />
-                </Button>
-              </Link>
+              {isAuthenticated ? (
+                <Link href="/dashboard/home">
+                  <Button size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                    Go to Dashboard
+                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/login">
+                  <Button size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                    Connect with GitHub
+                    <Github className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" />
+                  </Button>
+                </Link>
+              )}
               <Link href="/demo">
                 <Button size="lg" className="bg-white dark:bg-[#18181b] text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-[#27272a] rounded-md border border-zinc-200 dark:border-zinc-800 px-8 h-12 text-base font-medium shadow-sm group">
                   View Demo
