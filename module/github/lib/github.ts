@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/db"
 import { headers } from "next/headers"
 import { Octokit } from "octokit";
-import { type ReviewOutput } from "@/module/review/lib/engine";
+import { type ReviewOutput, partitionFindings } from "@/module/review/lib/engine";
 
 
 
@@ -259,7 +259,8 @@ export const postInlineReview = async (
   repo: string,
   prNumber: number,
   reviewObj: ReviewOutput,
-  fallbackMarkdown: string
+  fallbackMarkdown: string,
+  changedLines = 0
 ) => {
   const octokit = new Octokit({ auth: token });
   
@@ -275,14 +276,26 @@ export const postInlineReview = async (
   }
   body += `*This review was generated automatically by CodeLens.*`;
 
-  // 2. Format the inline comments mapping structured JSON to GitHub's schema
-  const comments = reviewObj.findings.map(finding => {
+  // 2. Format the inline comments mapping structured JSON to GitHub's schema.
+  // Only high-signal findings get their own inline comment; the rest already
+  // live in a collapsed section of the fallback markdown, so nothing is lost.
+  const { primary, secondary } = partitionFindings(reviewObj.findings, changedLines);
+
+  if (secondary.length > 0) {
+    body += `\n\n<details>\n<summary>${secondary.length} lower-confidence finding(s) not posted inline</summary>\n\n`;
+    body += secondary
+      .map(f => `- \`${f.file}:${f.startLine}\` **[${f.category}]** ${f.claim}${f.confidence ? ` _(${f.confidence})_` : ""}`)
+      .join("\n");
+    body += `\n</details>`;
+  }
+
+  const comments = primary.map(finding => {
     const emoji = finding.severity === "critical" ? "🚨" : finding.severity === "warning" ? "⚠️" : "💡";
     let commentBody = `### ${emoji} [${finding.category}] ${finding.severity.toUpperCase()}\n`;
     commentBody += `**Issue:** ${finding.claim}\n\n`;
     commentBody += `**Evidence:** ${finding.evidence}\n\n`;
     commentBody += `**Suggestion:** ${finding.suggestion}`;
-    
+
     return {
       path: finding.file,
       line: finding.startLine, // GitHub API needs exactly 'line' for a single-line comment
