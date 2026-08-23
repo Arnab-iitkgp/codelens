@@ -12,7 +12,9 @@ export async function executeAutoFix(
   filePath: string,
   finding: string,
   startLine: number,
-  endLine: number
+  endLine: number,
+  reviewId?: string,
+  findingIndex?: number
 ) {
   try {
     // This action spends the repository owner's GitHub token to write to their PR,
@@ -34,7 +36,7 @@ export async function executeAutoFix(
       throw new Error("Repository not found or you do not have access to it.");
     }
 
-    return await runAutoFixAndComment(
+    const result = await runAutoFixAndComment(
       owner,
       repo,
       prNumber,
@@ -43,6 +45,22 @@ export async function executeAutoFix(
       startLine,
       endLine
     );
+
+    if (result.success && reviewId && findingIndex !== undefined) {
+      const review = await prisma.review.findUnique({ where: { id: reviewId } });
+      if (review && review.traceData) {
+        const trace = review.traceData as any;
+        if (trace.verifiedFindings && trace.verifiedFindings[findingIndex]) {
+          trace.verifiedFindings[findingIndex].autoFixed = true;
+          await prisma.review.update({
+            where: { id: reviewId },
+            data: { traceData: trace },
+          });
+        }
+      }
+    }
+
+    return result;
   } catch (error) {
     console.error("[AutoFix] Error:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };

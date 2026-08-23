@@ -192,6 +192,9 @@ export default async function TracePage(props: { params: Promise<{ id: string }>
                       finding={findingBrief}
                       startLine={finding.startLine}
                       endLine={finding.endLine}
+                      reviewId={review.id}
+                      findingIndex={i}
+                      isFixed={finding.autoFixed}
                     />
                   </div>
                 </div>

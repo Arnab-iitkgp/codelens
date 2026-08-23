@@ -29,8 +29,11 @@ This structured code topology is injected into the System Prompt. To prevent hal
 ### Phase 2: The ReAct Loop (Think -> Plan -> Act)
 Armed with the structural orientation from Phase 1, the agent enters a hand-rolled 10-step loop (`MAX_STEPS`) around `generateText`. We drive the loop ourselves rather than using the SDK's `stopWhen`/`stepCountIs` helpers because each iteration injects `[System: Step X/10 — Y steps remaining]` into the message history, escalating warnings to force a conclusion.
 
+#### Resilience & Self-Healing
+Strict-schema providers (like Groq) reject the entire LLM request if the model hallucinates a tool argument (`InvalidToolInputError`). Instead of crashing the loop, the system catches these recoverable validation errors and feeds them back into the message history as a system nudge (`your last tool call was rejected... Use ONLY the exact parameter names`). This allows the agent to self-correct its syntax on the next step without losing its research progress.
+
 #### 1. Observation & Context Gathering
-- **`read_file(path)`**: Fetches the raw string content of a file from GitHub via Octokit. (This is the Ground Truth — the agent must read the file rather than blindly trusting the Phase 1 graph).
+- **`read_file(path, startLine?, endLine?)`**: Fetches the string content of a file from GitHub via Octokit. To protect the token budget and prevent massive files from blowing the context window (or serverless timeouts), whole-file reads are strictly capped at 400 lines. The agent is instructed to use the optional `startLine` and `endLine` parameters to surgically read the exact slice it needs.
 - **`query_ast_callers(symbolName)`**: Queries our Postgres `Edge` table on-the-fly to find the "Blast Radius" of additional symbols discovered during the investigation.
 - **`semantic_search(query)`**: Hits our Pinecone database to find where specific concepts are implemented. (Constrained to a maximum of 2 uses). Indexing stores graph symbols under the repository CUID and plain text files under the `owner/repo` string, so this tool queries **both** namespaces and merges the results — otherwise it would only ever see parsed symbols, never a README or config file.
 

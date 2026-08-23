@@ -207,17 +207,27 @@
 - Repaired `docs/decisions.md` (commit `2f81b1a` had overwritten D-015's heading). Added D-017, D-018, `docs/env_migration.md`.
 - **Next session:** create the 3072-dim Pinecone index, re-index all repos on Vertex, then re-run the demo indexer. Then agent capability tier → UI.
 
+### 2026-08-24 — Review Length, Auto-Reindex Integrity
+- **Reviews were enormous because every chunk was asked for a whole-PR narrative.** A 13-chunk PR produced 13 summaries and 13 walkthroughs joined by `---`. Chunks now return `{findings, strengths}` only (`chunkFindingsSchema`); one structure-scan call over file + hunk headers produces summary/walkthrough/diagram for the whole PR. This is D-010 Option B, decided but never implemented for the chunk path.
+- Fixed `verifyFindings` receiving the full diff instead of `diffChunk` — observed at ~41k input tokens per verify call, 3 calls per chunk. This also explains a run where most findings scored 0/3: the verifier was judging one chunk's findings against the entire diff and could not situate them.
+- Added `dedupeFindings` by `(file, startLine, category)` — chunks are reviewed independently, so a repeated pattern was reported once per chunk.
+- Added `partitionFindings`: findings beyond an inline cap of 12 (and nits on PRs over 500 changed lines) go to a collapsed `<details>` section instead of their own comment. **Confidence does not affect placement** — everything reaching this point already passed the 2/3 majority vote (D-009), so routing on confidence would silently raise that threshold to 3/3. It only affects ordering within the cap.
+- `getEmbeddingModel()` now throws a clear error on the `huggingface` door instead of a confusing one from `embeddingModelFor`.
+- **Auto-reindex on merge never worked.** `1855e2e` added the push handler and `triggerReindex`, but `createWebhook` was never subscribed to `push` — the events array has only ever held `pull_request` and the two comment events. Added `push`, and `createWebhook` now diffs an existing hook against the required events and calls `updateWebhook` rather than returning early, so already-connected repos are topped up.
+- **Every re-index leaked a full duplicate set of symbol vectors.** `indexRepo` wipes and rebuilds, so each run minted new cuids while vector ids were `symbol-${sym.id}` — orphaning the previous vectors instead of overwriting them. Ids are now derived from stable identity (`repoId` + `path` + `qualifiedName`), matching the Prisma unique constraint. `indexCodebase` was already safe (deterministic `${repoId}-${path}`).
+- **Next session:** re-index against `codelens-vector-embedding-v3` (empty), re-run the demo indexer, then the outstanding items below.
+
 ---
 
 ## Outstanding on the Auto-Fix / review path (found 2026-08-23, not yet fixed)
 
 | Issue | Location | Impact |
 | ----- | -------- | ------ |
-| `verifyFindings` gets `input` (full diff), not `diffChunk` | `module/review/lib/engine.ts:396` | Defeats chunking during the 3× verify pass on large PRs. If a verify call throws, `verifySingleLens` returns `[]` → every finding scores 0 votes → all findings silently dropped and the trace page shows everything "Rejected". |
 | `@codelens fix` passes a placeholder finding | `app/api/webhooks/github/route.ts:35` | The agent is told only the file path, never the bug. Should read the parent comment body via `in_reply_to_id`. |
 | Webhook does not verify `x-hub-signature-256` | `app/api/webhooks/github/route.ts` | Anyone who can POST to the endpoint can trigger reviews, re-indexing, and Auto-Fix runs. |
 | `performExistenceChecks` collapses `endLine` to `startLine` when snapping | `module/review/lib/engine.ts:308` | A snapped multi-line finding becomes a single-line suggestion range, so the agent's multi-line patch replaces one line. |
 | `ENABLE_AGENTIC_FIXER` documented but absent | — | No kill switch for the agent. |
+| Deleted/renamed symbols leave stale Pinecone vectors | `module/ai/lib/rag.ts` | Deterministic ids stop duplicates on re-index but do not remove vectors whose symbol no longer exists. Needs a delete pass. |
 | N+1 queries in the investigator | `module/review/lib/investigator.ts:36` | Re-fetches all symbols per chunk of the same file, then per-symbol caller/callee queries. |
 
 ---

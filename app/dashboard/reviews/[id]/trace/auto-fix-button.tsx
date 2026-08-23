@@ -21,9 +21,12 @@ export function AutoFixButton({
   finding: string;
   startLine: number;
   endLine: number;
+  reviewId?: string;
+  findingIndex?: number;
+  isFixed?: boolean;
 }) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(isFixed || false);
 
   const handleFix = async () => {
     setIsLoading(true);
@@ -35,7 +38,9 @@ export function AutoFixButton({
         filePath,
         finding,
         startLine,
-        endLine
+        endLine,
+        reviewId,
+        findingIndex
       );
       if (res.success) {
         setIsSuccess(true);
