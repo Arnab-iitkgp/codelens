@@ -175,9 +175,52 @@
 - Fixed critical edge-case bugs in OAuth parsing and Webhook line ranges.
 - **Next session:** Focus on running the Eval Harness, or finalizing the Hybrid Retrieval Merge (Phase 3E.5).
 
+### 2026-08-23 — Auto-Fix Path Hardening (PR → click → suggestion)
+- Traced the full Auto-Fix flow end to end (webhook → review → trace UI → agent → suggestion comment) and fixed every defect found on it.
+- **Fixed the agent's tool schemas (root cause of agent unreliability).** All five tools declared `parameters:`, which AI SDK v7 does not read — `tool()` is an identity function, so `inputSchema` was `undefined` and `asSchema(undefined)` substituted `{properties:{}, additionalProperties:false}`. Every tool was advertised to Gemini as taking **zero** arguments, and `additionalProperties:false` meant any argument the model did send failed validation (`InvalidToolInputError`). Renamed to `inputSchema:`; verified with `scratch/test-tool-schema.ts`.
+- Removed all 6 `@ts-ignore` and 5 `as any` casts from `agent-fixer.ts` — they were symptoms of the misnamed field, not a real zod-version mismatch (zod 4.2.1 + AI SDK v7 is a supported pair). `tsc --noEmit` and `eslint` are both clean.
+- Replaced deprecated `result.response.messages` with `result.responseMessages` (AGENTS.md rule #8) and typed the loop's message array as `ModelMessage[]`.
+- **The agent now knows which lines it is replacing.** `runAgenticFixer` takes `startLine`/`endLine`, and the system prompt carries an explicit Patch Contract: the snippet replaces exactly that range, preserves `startLine`'s indentation, and contains no fences or diff markers. Previously the line range was used only to *place* the comment and never shown to the agent, so the snippet could not match the range GitHub replaces.
+- `propose_patch` now strips stray code fences — a fence in the snippet would terminate the ` ```suggestion ` block early and corrupt the comment.
+- **Closed an authorization hole (D-017).** `executeAutoFix` was an exported `"use server"` action with no session check that acted with the repo owner's GitHub token. Split into `module/ai/lib/auto-fix.ts` (logic, no authz) + a thin auth-checked action; the webhook calls the lib directly since it has no session.
+- Fixed `semantic_search` blindness: it queried Pinecone with the repository CUID only, which matches graph symbols but never plain text files (indexed under `owner/repo`). Now queries both namespaces and merges.
+- Fixed a 422 source when posting: `commits[commits.length - 1].sha` from the paginated `pulls.listCommits` is not the head commit on PRs with >30 commits. Now reads `pulls.get().head.sha`.
+- Trace UI now passes claim + evidence + suggested direction + affected callers to the agent instead of the bare claim, so it doesn't re-derive what the review already proved.
+- Repaired `docs/decisions.md`: commit `2f81b1a` overwrote D-015's heading when inserting D-016, orphaning D-015's body under D-016.
+- Updated `docs/agent_architecture.md` to match the code (model id, hand-rolled loop vs `maxSteps`, `fixedSnippet` contract, dual-namespace search, authz boundary) and recorded that `ENABLE_AGENTIC_FIXER` is documented but not implemented.
+- **Next session:** the outstanding items below — `verifyFindings` receives the full diff instead of the chunk (`engine.ts:396`), the `@codelens fix` webhook passes a placeholder instead of the real finding (`route.ts:35`), and the webhook does not verify `x-hub-signature-256`. Then the Phase 0.5 baseline eval run.
+
+### 2026-08-23 — Per-Role Provider Chains (D-018)
+- Replaced the global `GCP_ENABLED` switch with **per-role env chains**: `AI_REVIEW_CHAIN`, `AI_AGENT_CHAIN`, `AI_EMBEDDING_CHAIN`, each an ordered list of `door:model` pairs. A "door" is the credential path — Vertex and AI Studio are two doors to the same Google models.
+- **All three roles now have failover.** Previously only review calls did; the agent had no try/catch at all and embeddings returned `null` per file. `runWithChain(role, fn)` walks the layers for everything.
+- The agent fails over **per run**, not per call — a half-finished investigation against a dead provider is worthless, and swapping models mid-conversation mixes two different tool-calling behaviours.
+- Fixed the bug class where **fallback layers silently served a different model than configured** (`provider === primaryProvider && AI_MODEL_ID`). Every layer now names its own model; a parse error throws instead of substituting a default.
+- Enforced the invariant that **every embedding layer must name the same model.** Different models produce incomparable vectors, so a mixed chain would silently corrupt the index rather than degrade. HuggingFace therefore cannot be an embedding *fallback* — a different vector space is a migration.
+- Truncation now comes from `MODEL_FACTS` per model instead of a hardcoded `slice(0, 8000)` — the mismatch that let mpnet's 384-token cap silently discard ~85% of every file.
+- **Embedding failures are now loud.** `indexCodebase` / `indexGraphSymbols` report `⚠️ N/M FAILED — the index is incomplete` and return `{total, indexed, failed}`. Previously a dropped embedding vanished while `indexedFileCount` still reported full coverage.
+- Capability probe (`scratch/check-embedding-models.ts`) established that **`gemini-embedding-001` is the only embedding ID that resolves on both Google doors** (3072 native, honours `outputDimensionality`). `gemini-embedding-2-preview` is absent on Vertex; `text-embedding-004/005` are absent on AI Studio. This is what makes the embedding failover safe.
+- Agent capability probe (`scratch/check-agent-door.ts`) confirmed **`groq:openai/gpt-oss-120b` completes the full ReAct loop in ~9s** respecting the line budget — so losing the Vertex door means *degraded*, not *disabled*.
+  - Required `read_file` to accept optional `startLine`/`endLine` (the model asked for them, and it fixes the 1281-line context bloat that blew the 15s Vercel timeout).
+  - Required treating malformed tool calls as recoverable — Groq validates tool arguments server-side and rejects the whole request, where Gemini passed them through unvalidated.
+- **Caught a bug in my own earlier fence-stripping:** it deleted a legitimate closing ` ``` ` from a README patch. Markdown files are now exempt, and elsewhere a lone fence line is dropped only because ` ``` ` can never be valid source code.
+- Verified: all 4 invariants reject correctly, legacy env derives an equivalent chain, `DISABLE_CIRCUIT_BREAKER` collapses to one layer, and a live run with a deliberately dead Vertex layer failed over to Groq and completed the fix. `tsc`, `eslint` and `next build` all clean.
+- Repaired `docs/decisions.md` (commit `2f81b1a` had overwritten D-015's heading). Added D-017, D-018, `docs/env_migration.md`.
+- **Next session:** create the 3072-dim Pinecone index, re-index all repos on Vertex, then re-run the demo indexer. Then agent capability tier → UI.
+
 ---
 
-## Blockers / Open Questions
+## Outstanding on the Auto-Fix / review path (found 2026-08-23, not yet fixed)
+
+| Issue | Location | Impact |
+| ----- | -------- | ------ |
+| `verifyFindings` gets `input` (full diff), not `diffChunk` | `module/review/lib/engine.ts:396` | Defeats chunking during the 3× verify pass on large PRs. If a verify call throws, `verifySingleLens` returns `[]` → every finding scores 0 votes → all findings silently dropped and the trace page shows everything "Rejected". |
+| `@codelens fix` passes a placeholder finding | `app/api/webhooks/github/route.ts:35` | The agent is told only the file path, never the bug. Should read the parent comment body via `in_reply_to_id`. |
+| Webhook does not verify `x-hub-signature-256` | `app/api/webhooks/github/route.ts` | Anyone who can POST to the endpoint can trigger reviews, re-indexing, and Auto-Fix runs. |
+| `performExistenceChecks` collapses `endLine` to `startLine` when snapping | `module/review/lib/engine.ts:308` | A snapped multi-line finding becomes a single-line suggestion range, so the agent's multi-line patch replaces one line. |
+| `ENABLE_AGENTIC_FIXER` documented but absent | — | No kill switch for the agent. |
+| N+1 queries in the investigator | `module/review/lib/investigator.ts:36` | Re-fetches all symbols per chunk of the same file, then per-symbol caller/callee queries. |
+
+---
 
 - [ ] Need real public PR URLs with known bugs for eval test cases
 - [ ] Verify `generateObject` support across Google, OpenAI, Groq providers

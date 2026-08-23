@@ -1,37 +1,48 @@
-import { pinecone, pineconeIndex } from "@/lib/pinecone-db";
+import { pineconeIndex } from "@/lib/pinecone-db";
 import { embed } from "ai";
-import { getEmbeddingModel } from "@/module/ai/lib/models";
+import {
+  runWithChain,
+  embeddingModelFor,
+  maxInputCharsFor,
+  getChain,
+  type Layer,
+} from "@/module/ai/lib/models";
 import { InferenceClient } from "@huggingface/inference";
 
-const DEFAULT_HF_EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2";
+async function embedViaHuggingFace(text: string, modelId: string): Promise<number[]> {
+  const hf = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
+  const result = await hf.featureExtraction({ model: modelId, inputs: text });
 
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const provider = process.env.AI_EMBEDDING_PROVIDER || "google";
-
-  if (provider === "huggingface") {
-    const hf = new InferenceClient(process.env.HUGGINGFACE_API_KEY);
-    const modelId =
-      process.env.AI_EMBEDDING_MODEL_ID || DEFAULT_HF_EMBEDDING_MODEL;
-
-    const result = await hf.featureExtraction({
-      model: modelId,
-      inputs: text,
-    });
-
-    // HF can return nested arrays (number[][]) depending on the model —
-    // flatten if needed (matches proven working pattern)
-    if (Array.isArray(result) && Array.isArray(result[0])) {
-      return result[0] as number[];
-    }
-    return result as number[];
+  // HF can return nested arrays (number[][]) depending on the model —
+  // flatten if needed (matches proven working pattern)
+  if (Array.isArray(result) && Array.isArray(result[0])) {
+    return result[0] as number[];
   }
+  return result as number[];
+}
 
-  // Default path: use Vercel AI SDK (google / openai)
-  const { embedding } = await embed({
-    model: getEmbeddingModel(),
-    value: text,
+/**
+ * Embeds text via the embedding chain (AI_EMBEDDING_CHAIN), failing over across
+ * credentials. Every layer is guaranteed by `getChain` to name the same model,
+ * so a failover never changes the vector space.
+ */
+export async function generateEmbedding(text: string): Promise<number[]> {
+  return runWithChain("embedding", async (layer: Layer) => {
+    if (layer.door === "huggingface") {
+      return embedViaHuggingFace(text, layer.model);
+    }
+    const { embedding } = await embed({
+      model: embeddingModelFor(layer),
+      value: text,
+    });
+    return embedding;
   });
-  return embedding;
+}
+
+/** Truncation limit of the configured embedding model, not a hardcoded guess. */
+export function embeddingInputLimit(): number {
+  const [first] = getChain("embedding");
+  return maxInputCharsFor(first.model);
 }
 
 export async function indexCodebase(
@@ -39,11 +50,12 @@ export async function indexCodebase(
   files: { path: string; content: string }[]
 ) {
   const pMap = (await import("p-map")).default;
+  const limit = embeddingInputLimit();
   const vectors = await pMap(
     files,
     async (file) => {
       const content = `File:  ${file.path}\n\n${file.content}`;
-      const truncatedContent = content.slice(0, 8000); // 8000 char token limit
+      const truncatedContent = content.slice(0, limit);
       try {
         const embedding = await generateEmbedding(truncatedContent);
         return {
@@ -62,9 +74,10 @@ export async function indexCodebase(
     },
     { concurrency: 5 } // 5 at a time to stay safe on API limits
   );
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validVectors = vectors.filter(Boolean) as any[];
+  const failed = vectors.length - validVectors.length;
 
   if (validVectors.length > 0) {
     const batchSize = 100;
@@ -73,7 +86,17 @@ export async function indexCodebase(
       await pineconeIndex.upsert(chunk);
     }
   }
-  console.log("indexing completed for repo:" + repoId);
+
+  // A dropped embedding used to vanish silently while indexedFileCount still
+  // reported full coverage — a partially indexed repo that looked complete.
+  // Surface it so a capped/misconfigured embedding provider is visible.
+  if (failed > 0) {
+    console.error(
+      `[INDEXING] ⚠️  ${failed}/${vectors.length} files FAILED to embed for ${repoId} — the index is incomplete.`
+    );
+  }
+  console.log(`[INDEXING] indexing completed for repo:${repoId} (${validVectors.length}/${vectors.length} files)`);
+  return { total: vectors.length, indexed: validVectors.length, failed };
 }
 
 export async function indexGraphSymbols(
@@ -81,12 +104,13 @@ export async function indexGraphSymbols(
   symbols: { id: string; path: string; qualifiedName: string; kind: string; codeBody: string }[]
 ) {
   const pMap = (await import("p-map")).default;
+  const limit = embeddingInputLimit();
   const vectors = await pMap(
     symbols,
     async (sym) => {
       // Create a rich context string for the symbol
       const content = `Symbol: ${sym.qualifiedName}\nPath: ${sym.path}\nKind: ${sym.kind}\n\n${sym.codeBody}`;
-      const truncatedContent = content.slice(0, 8000);
+      const truncatedContent = content.slice(0, limit);
       try {
         const embedding = await generateEmbedding(truncatedContent);
         return {
@@ -111,6 +135,7 @@ export async function indexGraphSymbols(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validVectors = vectors.filter(Boolean) as any[];
+  const failed = vectors.length - validVectors.length;
 
   if (validVectors.length > 0) {
     const batchSize = 100;
@@ -119,7 +144,14 @@ export async function indexGraphSymbols(
       await pineconeIndex.upsert(chunk);
     }
   }
-  console.log(`[INDEXING] Embedded ${validVectors.length} symbols for repo: ${repoId}`);
+
+  if (failed > 0) {
+    console.error(
+      `[INDEXING] ⚠️  ${failed}/${vectors.length} symbols FAILED to embed for ${repoId} — the graph index is incomplete.`
+    );
+  }
+  console.log(`[INDEXING] Embedded ${validVectors.length}/${vectors.length} symbols for repo: ${repoId}`);
+  return { total: vectors.length, indexed: validVectors.length, failed };
 }
 
 export async function retrieveContext(query: string,repoId:string, topK:number=5) {

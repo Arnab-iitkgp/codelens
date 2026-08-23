@@ -160,29 +160,43 @@ export default async function TracePage(props: { params: Promise<{ id: string }>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {verifiedFindings.map((finding: any, i: number) => (
-              <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 flex flex-col sm:flex-row gap-4 justify-between items-start">
-                <div>
-                  <div className="flex gap-2 items-center mb-1">
-                    <Badge variant="outline">{finding.category}</Badge>
-                    <span className="text-xs font-mono text-muted-foreground">{finding.file}:{finding.startLine}-{finding.endLine}</span>
+            {verifiedFindings.map((finding: any, i: number) => {
+              // Hand the agent the full finding, not just the claim — the evidence and
+              // blast radius were already computed by the review pipeline, so making
+              // the agent rediscover them wastes steps and invites a different diagnosis.
+              const findingBrief = [
+                `Claim: ${finding.claim}`,
+                finding.evidence ? `Evidence: ${finding.evidence}` : null,
+                finding.suggestion ? `Reviewer's suggested direction: ${finding.suggestion}` : null,
+                finding.affects?.length ? `Callers reported as affected: ${finding.affects.join(", ")}` : null,
+              ]
+                .filter(Boolean)
+                .join("\n");
+
+              return (
+                <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 flex flex-col sm:flex-row gap-4 justify-between items-start">
+                  <div>
+                    <div className="flex gap-2 items-center mb-1">
+                      <Badge variant="outline">{finding.category}</Badge>
+                      <span className="text-xs font-mono text-muted-foreground">{finding.file}:{finding.startLine}-{finding.endLine}</span>
+                    </div>
+                    <p className="text-sm font-semibold">{finding.claim}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{finding.suggestion}</p>
                   </div>
-                  <p className="text-sm font-semibold">{finding.claim}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{finding.suggestion}</p>
+                  <div className="shrink-0 mt-2 sm:mt-0">
+                    <AutoFixButton
+                      owner={review.repository.owner}
+                      repo={review.repository.name}
+                      prNumber={review.prNumber}
+                      filePath={finding.file}
+                      finding={findingBrief}
+                      startLine={finding.startLine}
+                      endLine={finding.endLine}
+                    />
+                  </div>
                 </div>
-                <div className="shrink-0 mt-2 sm:mt-0">
-                  <AutoFixButton 
-                    owner={review.repository.owner}
-                    repo={review.repository.name}
-                    prNumber={review.prNumber}
-                    filePath={finding.file}
-                    finding={finding.claim}
-                    startLine={finding.startLine}
-                    endLine={finding.endLine}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {verifiedFindings.length === 0 && (
               <p className="text-sm text-muted-foreground">No findings survived the verification pass. A clean bill of health was posted! 🎉</p>
             )}

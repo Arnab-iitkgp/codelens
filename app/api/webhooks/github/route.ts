@@ -27,12 +27,14 @@ export async function POST (req:NextRequest){
                 if (comment.path && (comment.line || comment.original_line)) {
                     console.log(`Triggering Auto-Fix for PR #${prNumber} on ${comment.path}`);
                     
-                    const { executeAutoFix } = await import("@/module/ai/actions/fix");
+                    // Calls the lib directly: a webhook has no user session, so it
+                    // cannot go through the session-checked executeAutoFix action.
+                    const { runAutoFixAndComment } = await import("@/module/ai/lib/auto-fix");
                     const endLine = comment.original_line || comment.line;
                     const startLine = comment.original_start_line || comment.start_line || endLine;
-                    
+
                     // Fire and forget so we don't block the webhook response
-                    executeAutoFix(owner, repoName, prNumber, comment.path, "User requested Auto-Fix via comment mention.", startLine, endLine)
+                    runAutoFixAndComment(owner, repoName, prNumber, comment.path, "User requested Auto-Fix via comment mention.", startLine, endLine)
                         .catch(err => console.error("Webhook Auto-Fix Failed:", err));
                         
                 } else {
