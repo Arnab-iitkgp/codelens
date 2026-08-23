@@ -283,7 +283,7 @@ function formatReviewAsMarkdown(review: ReviewOutput, changedLines = 0): string 
     if (secondary.length > 0) {
       const body = secondary.flatMap(renderFinding).join("\n\n");
       parts.push(
-        `<details>\n<summary>${secondary.length} lower-confidence finding(s)</summary>\n\n${body}\n</details>\n`
+        `<details>\n<summary>${secondary.length} additional finding(s)</summary>\n\n${body}\n</details>\n`
       );
     }
   } else {
@@ -462,39 +462,37 @@ function dedupeFindings(findings: ReviewOutput["findings"]): ReviewOutput["findi
 const SEVERITY_RANK: Record<string, number> = { critical: 3, warning: 2, nit: 1 };
 
 /**
- * Splits findings into what deserves an inline comment and what belongs in a
- * collapsed section. Uses the confidence score we already compute for routing,
- * not just for display, so a long review reads short without losing anything.
+ * Orders findings and splits off overflow. Everything here has ALREADY passed
+ * the majority vote in verifyFindings (2/3 = verified, per D-009), so this must
+ * not second-guess that verdict — the vote decides validity, this decides volume
+ * only. The collapsed section is for what exceeds the inline cap, nothing else.
  */
 export function partitionFindings(
   findings: ReviewOutput["findings"],
   changedLines: number,
   maxInline = 12
 ): { primary: ReviewOutput["findings"]; secondary: ReviewOutput["findings"] } {
-  // On a large PR, nits are noise.
-  const NIT_FLOOR_LINES = 500;
-  const kept = changedLines > NIT_FLOOR_LINES ? findings.filter(f => f.severity !== "nit") : findings;
-  const droppedNits = findings.length - kept.length;
-  if (droppedNits > 0) {
-    console.log(`[engine] Suppressed ${droppedNits} nit(s): PR touches ${changedLines} lines.`);
-  }
-
-  const ranked = [...kept].sort((a, b) => {
+  const ranked = [...findings].sort((a, b) => {
     const sev = (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0);
     if (sev !== 0) return sev;
     return (parseInt(b.confidence) || 0) - (parseInt(a.confidence) || 0);
   });
 
-  // Inline is for things we are confident about; the rest is still reported,
-  // just collapsed.
-  const isHighSignal = (f: ReviewOutput["findings"][number]) =>
-    f.severity === "critical" || (parseInt(f.confidence) || 0) >= 3;
+  // On a large PR nits are noise, so they lose their inline slot — but they are
+  // still reported in the collapsed section rather than deleted.
+  const NIT_FLOOR_LINES = 500;
+  const demoteNits = changedLines > NIT_FLOOR_LINES;
 
   const primary: ReviewOutput["findings"] = [];
   const secondary: ReviewOutput["findings"] = [];
   for (const f of ranked) {
-    if (primary.length < maxInline && isHighSignal(f)) primary.push(f);
+    const eligible = !(demoteNits && f.severity === "nit");
+    if (eligible && primary.length < maxInline) primary.push(f);
     else secondary.push(f);
+  }
+
+  if (secondary.length > 0) {
+    console.log(`[engine] ${primary.length} finding(s) inline, ${secondary.length} collapsed (cap ${maxInline}${demoteNits ? ", nits demoted" : ""}).`);
   }
   return { primary, secondary };
 }

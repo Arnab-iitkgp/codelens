@@ -282,7 +282,7 @@ export const postInlineReview = async (
   const { primary, secondary } = partitionFindings(reviewObj.findings, changedLines);
 
   if (secondary.length > 0) {
-    body += `\n\n<details>\n<summary>${secondary.length} lower-confidence finding(s) not posted inline</summary>\n\n`;
+    body += `\n\n<details>\n<summary>${secondary.length} additional finding(s) not posted inline</summary>\n\n`;
     body += secondary
       .map(f => `- \`${f.file}:${f.startLine}\` **[${f.category}]** ${f.claim}${f.confidence ? ` _(${f.confidence})_` : ""}`)
       .join("\n");
