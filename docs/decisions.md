@@ -21,6 +21,53 @@ a new architectural choice, add a new entry at the top (newest first) with:
 
 ---
 
+## D-018 · Per-role provider chains in env, replacing the global `GCP_ENABLED` switch
+- **Date:** 2026-08-23
+- **Status:** accepted
+- **Context:** D-015 split routing by *model role* (`AI_MODEL_ID` vs `AI_AGENT_MODEL_ID`) but not by *provider*. `GCP_ENABLED` was a single global boolean that forced **all** Google traffic — review, agent and embeddings — down one path, so "agent on Vertex, embeddings on the free API" was inexpressible. Three concrete bugs came out of that design:
+  1. **Fallback layers silently served a different model than configured.** The condition was `provider === primaryProvider && AI_MODEL_ID`, so with `AI_PROVIDER=google` the Groq layer used a hardcoded `llama-3.1-8b-instant`, and with `AI_PROVIDER=groq` the Google layer used `gemini-3.1-flash-lite-preview`. The last working review layer was far weaker than intended, invisibly.
+  2. **The free Gemini API was unreachable unless `AI_PROVIDER=google`.** The `["google","google"]` duplicate enabling the Vertex→AI-Studio hop was only pushed in that case, with intent encoded in a mutable `hasTriedVertex` boolean rather than in the list.
+  3. **`AI_EMBEDDING_MODEL_ID` meant two different things** — an HF model name in `rag.ts`, a Google model name in `models.ts` — so changing the provider without the model ID crossed the wires. The agent had the same door/model drift risk.
+  Additionally, only review calls had a circuit breaker; the agent and the embedding path had none.
+- **Decision:** Declare routing in env as one ordered chain of `door:model` pairs per role.
+  ```
+  AI_REVIEW_CHAIN="groq:openai/gpt-oss-120b,google-vertex:...,google-api:..."
+  AI_AGENT_CHAIN="google-vertex:gemini-3.1-pro-preview,groq:openai/gpt-oss-120b"
+  AI_EMBEDDING_CHAIN="google-vertex:gemini-embedding-001,google-api:gemini-embedding-001"
+  ```
+  Doors: `google-vertex` · `google-api` · `groq` · `openai` (+ `huggingface` for embeddings). A door is the *credential path*, so Vertex and AI Studio are two doors to the same Google models.
+
+  **Dividing line:** env owns **routing** (which door, which model, what order); code owns **model facts** (context limits, dimensions — `MODEL_FACTS`). A model ID changing is an operational event that must be fixable without a deploy; a model's context window is not a tuning knob.
+
+  **Four invariants, enforced at resolution, failing loudly:**
+  1. Parse errors throw. Never substitute a default model.
+  2. Every layer names its own model — no implicit `DEFAULT_MODEL_ID`.
+  3. Every **embedding** layer must name the *same* model. Vectors from different models are incomparable, so a mixed chain would silently corrupt the index rather than degrade. This is why HuggingFace cannot be an embedding *fallback* — a different vector space is a migration, not a failover.
+  4. Doors are validated per role (`huggingface` is embedding-only).
+
+  `runWithChain(role, fn)` walks the layers, so **all three roles** now have failover. The agent fails over **per run**, not per call — a half-finished investigation against a dead provider is worthless, and swapping models mid-conversation mixes two different tool-calling behaviours.
+- **Alternatives considered:**
+  - *Presets in code selected by one env var:* type-safe and diffable, but a retired preview model would need a PR and a deploy to route around. Rejected on operational grounds.
+  - *Keeping `GCP_ENABLED` alongside chains:* two switches for one decision, and the global would keep silently overriding the explicit chain.
+  - *Cross-model embedding fallback (Google → HuggingFace):* dimensionally impossible against a fixed-dimension index, and semantically worse than failing — a query embedded by a different model than the stored vectors returns confident garbage with no error.
+- **Consequences:** Swapping a provider is one env edit per role, testable locally before it is needed. `google-vertex` now means Vertex-only (it throws if credentials are absent) so failover is explicit in the chain instead of hidden inside `getNextGoogleProvider`. Legacy env vars still derive an equivalent chain when the new ones are unset, so code can deploy before config. Verified 2026-08-23: all four invariants reject correctly, legacy derivation reproduces prior behaviour, and a live run with a deliberately dead Vertex layer failed over to Groq and completed the fix loop.
+
+---
+## D-017 · Auto-Fix authorization lives in the action; core logic lives in `lib/`
+- **Date:** 2026-08-23
+- **Status:** accepted
+- **Context:** `executeAutoFix` was an exported `"use server"` action with no authorization check. It resolved the repository by `(owner, name)` and then acted with **that repository owner's** GitHub token, so any caller able to reach the action endpoint could make CodeLens write inline comments on any connected repo as its owner. Every other server action in the codebase (`module/review/action`, `module/repository/action`, `module/settings/actions`) already gates on `auth.api.getSession()`. The naive fix — adding a session check in place — breaks the `@codelens fix` webhook path, because a GitHub webhook has no user session.
+- **Decision:** Split the two concerns.
+  1. `module/ai/lib/auto-fix.ts` exports `runAutoFixAndComment()` — the agent run plus the GitHub suggestion post. It performs **no** authorization and must never be exported from a `"use server"` module.
+  2. `module/ai/actions/fix.ts` keeps a thin `"use server"` `executeAutoFix()` that verifies the session **and** that `repository.userId === session.user.id`, then delegates.
+  3. The webhook (`app/api/webhooks/github/route.ts`) imports the lib directly, since it is authorized by being a webhook rather than by a session.
+- **Alternatives considered:**
+  - Session check inside the single shared function: breaks the webhook caller.
+  - A `trusted: boolean` parameter to skip the check: worthless, since the caller of a server action controls every argument.
+  - Ownership check without a session check: still lets an unauthenticated caller act, just on a narrower set of repos.
+- **Consequences:** Authorization is enforced at exactly one boundary, and the rule is now explicit: anything exported from a `"use server"` module is a public endpoint and must authorize its own caller. Still open: the webhook does not verify GitHub's `x-hub-signature-256`, so the lib is reachable by anyone who can POST to it.
+
+---
 ## D-016 · Step-Budget Awareness and Deterministic Pre-gathering for ReAct Agent
 - **Date:** 2026-08-23
 - **Status:** accepted
@@ -33,6 +80,9 @@ a new architectural choice, add a new entry at the top (newest first) with:
   - *Hard limit (fail on step 7):* Tried previously, caused the agent to silently fail mid-research.
   - *Pre-injecting full file contents:* Rejected because it pollutes the context window for large files and bypasses the agent's autonomous Observation phase (`read_file`). The graph structural injection provides orientation without bloating context.
 - **Consequences:** The agent behaves vastly more intelligently, completing fixes in 3-4 steps instead of spiraling. It acts deterministically first (using the graph) and agentic second (using tools to fill gaps).
+
+---
+## D-015 · Split-Brain AI Architecture with 4-Layer Circuit Breaker
 - **Date:** 2026-08-23
 - **Status:** accepted
 - **Context:** We need a way to route fast, bulk code reviews (The Critic) to cheap models (like Groq or Flash) while routing complex, single-file reasoning tasks (The Auto-Fix Agent) to expensive, highly-intelligent models (like Vertex AI Pro). Furthermore, enterprise users on GCP Vertex AI need a resilient fallback chain if GCP goes down.
