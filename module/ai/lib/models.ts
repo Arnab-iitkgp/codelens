@@ -317,9 +317,18 @@ export function getLanguageModel(modelIdOverride?: string): LanguageModel {
   return languageModelFor(modelIdOverride ? { ...first, model: modelIdOverride } : first);
 }
 
-/** First layer of the embedding chain. Note: the huggingface door is handled in rag.ts. */
+/**
+ * First layer of the embedding chain, for callers that need a raw AI SDK model.
+ * Throws for the `huggingface` door, which has no AI SDK model — use
+ * `generateEmbedding()` in rag.ts instead, which handles every door.
+ */
 export function getEmbeddingModel(): EmbeddingModel {
   const [first] = getChain("embedding");
+  if (first.door === "huggingface") {
+    throw new Error(
+      `getEmbeddingModel(): the "huggingface" door has no AI SDK model. Use generateEmbedding() from rag.ts, which routes the whole chain.`
+    );
+  }
   return embeddingModelFor(first);
 }
 
