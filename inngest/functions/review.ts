@@ -76,12 +76,12 @@ export const generateReview = inngest.createFunction(
       console.log(
         `[review] engine done: ${latencyMs}ms, retrieval=${meta.retrievalMode}, chunks=${meta.chunkCount}, provider=${meta.provider}`
       );
-      return { output, structured, trace };
+      return { output, structured, trace, changedLines: meta.changedLines };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as { output: string, structured: ReviewOutput, trace: any };
+    }) as { output: string, structured: ReviewOutput, trace: any, changedLines: number };
 
     await step.run("post-comment", async () => {
-      await postInlineReview(token, owner, repo, prNumber, review.structured, review.output);
+      await postInlineReview(token, owner, repo, prNumber, review.structured, review.output, review.changedLines);
     });
 
     //store review in db

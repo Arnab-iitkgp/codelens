@@ -26,6 +26,25 @@ export const reviewSchema = z.object({
 
 export type ReviewOutput = z.infer<typeof reviewSchema>;
 
+/**
+ * What a single diff CHUNK is asked for. Deliberately excludes summary /
+ * walkthrough / sequenceDiagram: a chunk only sees its own slice, so asking each
+ * one for a whole-PR narrative produced N partial summaries concatenated with
+ * "---" separators — the main cause of enormous reviews, and incoherent besides.
+ * The narrative comes from one structure-scan call instead (D-010 Option B).
+ */
+const chunkFindingsSchema = z.object({
+  strengths: z.array(z.string()).describe("What is done well in this part of the diff"),
+  findings: reviewSchema.shape.findings,
+});
+
+/** What the single structure-scan call produces for the whole PR. */
+const narrativeSchema = z.object({
+  summary: reviewSchema.shape.summary,
+  walkthrough: reviewSchema.shape.walkthrough,
+  sequenceDiagram: reviewSchema.shape.sequenceDiagram,
+});
+
 export const verifySchema = z.object({
   verdicts: z.array(
     z.object({
@@ -55,6 +74,7 @@ export type RunReviewMeta = {
   retrievalMode: RetrievalMode;
   chunkCount: number;
   provider: string;
+  changedLines: number;
 };
 
 export type RunReviewResult = {
@@ -222,7 +242,24 @@ async function verifyFindings(
   return verifiedFindings;
 }
 
-function formatReviewAsMarkdown(review: ReviewOutput): string {
+function renderFinding(f: ReviewOutput["findings"][number]): string[] {
+  const emoji =
+    f.severity === "critical" ? "🚨" : f.severity === "warning" ? "⚠️" : "💡";
+  const parts: string[] = [];
+  parts.push(
+    `### ${emoji} [${f.category}] \`${f.file}:${f.startLine}-${f.endLine}\` ${f.confidence ? `(Confidence: ${f.confidence})` : ""}`
+  );
+  parts.push(`**Issue:** ${f.claim}`);
+  parts.push(`**Evidence:** ${f.evidence}`);
+  parts.push(`**Suggestion:** ${f.suggestion}`);
+  if (f.affects && f.affects.length > 0) {
+    parts.push(`💥 **Blast Radius (Regression Risk):**\n${f.affects.map(a => `- \`${a}\``).join("\n")}`);
+  }
+  parts.push("");
+  return parts;
+}
+
+function formatReviewAsMarkdown(review: ReviewOutput, changedLines = 0): string {
   const parts: string[] = [];
 
   parts.push(`## Summary\n${review.summary}\n`);
@@ -237,24 +274,17 @@ function formatReviewAsMarkdown(review: ReviewOutput): string {
   }
 
   if (review.findings.length > 0) {
+    // High-signal findings are shown; the rest are collapsed rather than dropped.
+    const { primary, secondary } = partitionFindings(review.findings, changedLines);
+
     parts.push(`## Findings\n`);
-    for (const f of review.findings) {
-      const emoji =
-        f.severity === "critical"
-          ? "🚨"
-          : f.severity === "warning"
-          ? "⚠️"
-          : "💡";
+    for (const f of primary) parts.push(...renderFinding(f));
+
+    if (secondary.length > 0) {
+      const body = secondary.flatMap(renderFinding).join("\n\n");
       parts.push(
-        `### ${emoji} [${f.category}] \`${f.file}:${f.startLine}-${f.endLine}\` ${f.confidence ? `(Confidence: ${f.confidence})` : ""}`
+        `<details>\n<summary>${secondary.length} additional finding(s)</summary>\n\n${body}\n</details>\n`
       );
-      parts.push(`**Issue:** ${f.claim}`);
-      parts.push(`**Evidence:** ${f.evidence}`);
-      parts.push(`**Suggestion:** ${f.suggestion}`);
-      if (f.affects && f.affects.length > 0) {
-        parts.push(`💥 **Blast Radius (Regression Risk):**\n${f.affects.map(a => `- \`${a}\``).join("\n")}`);
-      }
-      parts.push(""); // Add an empty line between findings
     }
   } else {
     parts.push(`## Findings\nNo significant issues found! 🎉\n`);
@@ -357,6 +387,116 @@ function chunkDiff(diff: string, maxChars = 12000): string[] {
   return chunks.length > 0 ? chunks : [diff]; // Fallback to raw diff if splitting fails
 }
 
+/** Counts added/removed lines, used to scale how noisy a review is allowed to be. */
+function countChangedLines(diff: string): number {
+  let n = 0;
+  for (const line of diff.split("\n")) {
+    if ((line.startsWith("+") || line.startsWith("-")) && !line.startsWith("+++") && !line.startsWith("---")) n++;
+  }
+  return n;
+}
+
+/**
+ * Reduces the diff to its skeleton — file headers and hunk headers only, no code.
+ * Cheap enough to send whole even for a large PR, and it is the only view that
+ * can produce a coherent whole-PR narrative.
+ */
+function buildStructureView(diff: string): string {
+  const lines: string[] = [];
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      const m = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+      lines.push(`\nFILE: ${m ? m[2] : line.replace("diff --git ", "")}`);
+    } else if (line.startsWith("@@")) {
+      lines.push(`  HUNK ${line.replace(/^@@\s*/, "").replace(/\s*@@.*$/, "")}`);
+    }
+  }
+  return lines.join("\n").trim();
+}
+
+/** One call for the whole-PR narrative, replacing N per-chunk summaries. */
+async function generateNarrative(
+  input: RunReviewInput,
+  diff: string
+): Promise<z.infer<typeof narrativeSchema>> {
+  const prompt = `You are an expert code reviewer writing the top-level summary of a pull request.
+
+PR Title: ${input.title}
+PR Description: ${input.description || "No description provided"}
+
+You are given the STRUCTURE of the diff — every changed file and the line ranges touched, without the code itself:
+${buildStructureView(diff)}
+
+Write a concise whole-PR narrative using the JSON schema.
+- 'summary': at most 3 sentences on what this PR does overall.
+- 'walkthrough': one short line per file, in the form "path — what changed". No preamble, no conclusion.
+- 'sequenceDiagram': a Mermaid sequenceDiagram ONLY if the change clearly alters a runtime flow across components. Otherwise return an empty string.
+Do not speculate about bugs — a separate pass handles findings.`;
+
+  try {
+    const { object } = await generateObjectWithFallback(prompt, narrativeSchema);
+    return object;
+  } catch (error) {
+    console.error("[engine] Narrative pass failed:", error);
+    return { summary: "", walkthrough: "", sequenceDiagram: "" };
+  }
+}
+
+/**
+ * Merges findings that describe the same problem. Chunks are reviewed
+ * independently, so a pattern repeated across files was reported once per chunk.
+ */
+function dedupeFindings(findings: ReviewOutput["findings"]): ReviewOutput["findings"] {
+  const seen = new Map<string, ReviewOutput["findings"][number]>();
+  for (const f of findings) {
+    const key = `${f.file}:${f.startLine}:${f.category}`;
+    const prev = seen.get(key);
+    // Keep whichever the verifiers were more sure of.
+    if (!prev || (parseInt(f.confidence) || 0) > (parseInt(prev.confidence) || 0)) {
+      seen.set(key, f);
+    }
+  }
+  return [...seen.values()];
+}
+
+const SEVERITY_RANK: Record<string, number> = { critical: 3, warning: 2, nit: 1 };
+
+/**
+ * Orders findings and splits off overflow. Everything here has ALREADY passed
+ * the majority vote in verifyFindings (2/3 = verified, per D-009), so this must
+ * not second-guess that verdict — the vote decides validity, this decides volume
+ * only. The collapsed section is for what exceeds the inline cap, nothing else.
+ */
+export function partitionFindings(
+  findings: ReviewOutput["findings"],
+  changedLines: number,
+  maxInline = 12
+): { primary: ReviewOutput["findings"]; secondary: ReviewOutput["findings"] } {
+  const ranked = [...findings].sort((a, b) => {
+    const sev = (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0);
+    if (sev !== 0) return sev;
+    return (parseInt(b.confidence) || 0) - (parseInt(a.confidence) || 0);
+  });
+
+  // On a large PR nits are noise, so they lose their inline slot — but they are
+  // still reported in the collapsed section rather than deleted.
+  const NIT_FLOOR_LINES = 500;
+  const demoteNits = changedLines > NIT_FLOOR_LINES;
+
+  const primary: ReviewOutput["findings"] = [];
+  const secondary: ReviewOutput["findings"] = [];
+  for (const f of ranked) {
+    const eligible = !(demoteNits && f.severity === "nit");
+    if (eligible && primary.length < maxInline) primary.push(f);
+    else secondary.push(f);
+  }
+
+  if (secondary.length > 0) {
+    console.log(`[engine] ${primary.length} finding(s) inline, ${secondary.length} collapsed (cap ${maxInline}${demoteNits ? ", nits demoted" : ""}).`);
+  }
+  return { primary, secondary };
+}
+
 export async function runReview(
   input: RunReviewInput
 ): Promise<RunReviewResult> {
@@ -372,30 +512,38 @@ export async function runReview(
   const allInitialFindings: ReviewOutput["findings"] = [];
   const allVerifiedFindings: ReviewOutput["findings"] = [];
   const allChunks: InvestigatedChunk[] = [];
-  const summaries: string[] = [];
-  const walkthroughs: string[] = [];
   const strengths: string[] = [];
-  let sequenceDiagram = "";
   let overallRetrievalMode: RetrievalMode = "skipped";
   let totalRetrievedChunks = 0;
-  
+
   // 2. Process each chunk in parallel
   const reviewModeSetting = input.reviewMode ?? "standard";
   const provider = process.env.AI_PROVIDER ?? "google";
+
+  // The whole-PR narrative comes from ONE structure-scan call, in parallel with
+  // the per-chunk finding passes (D-010 Option B).
+  const narrativePromise = generateNarrative(input, filteredDiff);
 
   const chunkPromises = diffChunks.map(async (diffChunk) => {
     const { chunks, mode } = await retrieve({ ...input, diff: diffChunk });
     if (mode === "diff") overallRetrievalMode = "diff";
     if (mode === "fallback" && overallRetrievalMode === "skipped") overallRetrievalMode = "fallback";
-    
+
     const prompt = buildPrompt({ ...input, diff: diffChunk }, chunks);
-    
-    const { object } = await generateObjectWithFallback(prompt, reviewSchema);
-    
+
+    const { object } = await generateObjectWithFallback(prompt, chunkFindingsSchema);
+
     const rawInitialFindings = JSON.parse(JSON.stringify(object.findings));
-    const verifiedFindings = await verifyFindings(input, chunks, object.findings, reviewModeSetting);
+    // Verify against THIS chunk, not the whole diff — otherwise chunking is
+    // defeated and the verify calls can blow the context limit on a large PR.
+    const verifiedFindings = await verifyFindings(
+      { ...input, diff: diffChunk },
+      chunks,
+      object.findings,
+      reviewModeSetting
+    );
     const groundedFindings = performExistenceChecks(diffChunk, verifiedFindings);
-    
+
     return {
       object,
       groundedFindings,
@@ -405,33 +553,38 @@ export async function runReview(
   });
 
   const results = await Promise.all(chunkPromises);
+  const narrative = await narrativePromise;
 
   // 3. Merge results
   for (const res of results) {
     allInitialFindings.push(...res.rawInitialFindings);
     allVerifiedFindings.push(...res.groundedFindings);
     allChunks.push(...res.retrievedChunks);
-    
-    if (res.object.summary) summaries.push(res.object.summary);
-    if (res.object.walkthrough) walkthroughs.push(res.object.walkthrough);
     if (res.object.strengths) strengths.push(...res.object.strengths);
-    if (res.object.sequenceDiagram && !sequenceDiagram) sequenceDiagram = res.object.sequenceDiagram;
     totalRetrievedChunks += res.retrievedChunks.length;
   }
 
   // Deduplicate strengths and retrieved chunks
-  const uniqueStrengths = Array.from(new Set(strengths));
+  const uniqueStrengths = Array.from(new Set(strengths)).slice(0, 5);
   const uniqueChunks = Array.from(new Map(allChunks.map(c => [c.content, c])).values());
 
+  // Chunks are reviewed independently, so the same issue can be reported more
+  // than once. Dedupe before anything is posted.
+  const dedupedFindings = dedupeFindings(allVerifiedFindings);
+  if (dedupedFindings.length !== allVerifiedFindings.length) {
+    console.log(`[engine] Deduped ${allVerifiedFindings.length - dedupedFindings.length} duplicate finding(s).`);
+  }
+
   const mergedObject: ReviewOutput = {
-    summary: summaries.join("\n\n---\n\n"),
-    walkthrough: walkthroughs.join("\n\n"),
-    sequenceDiagram,
+    summary: narrative.summary,
+    walkthrough: narrative.walkthrough,
+    sequenceDiagram: narrative.sequenceDiagram,
     strengths: uniqueStrengths,
-    findings: allVerifiedFindings
+    findings: dedupedFindings
   };
 
-  const markdownOutput = formatReviewAsMarkdown(mergedObject);
+  const changedLines = countChangedLines(filteredDiff);
+  const markdownOutput = formatReviewAsMarkdown(mergedObject, changedLines);
   
   const latencyMs = Date.now() - startedAt;
   return {
@@ -442,6 +595,7 @@ export async function runReview(
       retrievalMode: overallRetrievalMode,
       chunkCount: totalRetrievedChunks,
       provider,
+      changedLines,
     },
     trace: {
       chunks: uniqueChunks,
