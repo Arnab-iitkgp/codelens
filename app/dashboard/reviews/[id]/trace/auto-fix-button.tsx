@@ -13,6 +13,9 @@ export function AutoFixButton({
   finding,
   startLine,
   endLine,
+  reviewId,
+  findingIndex,
+  isFixed,
 }: {
   owner: string;
   repo: string;
