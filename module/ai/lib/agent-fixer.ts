@@ -1,7 +1,7 @@
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
 import { createVertex } from '@ai-sdk/google-vertex';
-import { getLanguageModel } from './models';
+import { getLanguageModel, getNextGoogleProvider } from './models';
 import { Octokit } from 'octokit';
 import { retrieveContext } from './rag';
 import prisma from '@/lib/db';
@@ -12,8 +12,9 @@ function getAgentModel() {
   const agentModelId = process.env.AI_AGENT_MODEL_ID || "gemini-3.1-pro-preview";
   console.log(`[Agent] Booting agent using model: ${agentModelId} (GCP_ENABLED=${process.env.GCP_ENABLED || "false"})`);
   
-  // getLanguageModel now automatically handles GCP_ENABLED vs API Key routing system-wide
-  return { model: getLanguageModel(agentModelId), modelId: agentModelId };
+  // The Agent strictly uses Google/Vertex models, bypassing the primary AI_PROVIDER (which is Groq for reviews)
+  const provider = getNextGoogleProvider(false);
+  return { model: provider(agentModelId), modelId: agentModelId };
 }
 
 /**
@@ -111,10 +112,7 @@ export async function runAgenticFixer(
     }) as any,
   };
 
-  const messages: any[] = [
-    {
-      role: 'system',
-      content: `You are an autonomous Senior Engineering Agent. 
+  const systemPrompt = `You are an autonomous Senior Engineering Agent. 
 Your goal is to fix the following bug in the repository ${owner}/${repo}:
 "${bugFinding}"
 
@@ -124,8 +122,9 @@ You MUST follow this exact sequence:
 2. If you need to understand callers/dependencies, use 'query_ast_callers'.
 3. If you need to find an abstract concept, use 'semantic_search'.
 4. Use 'write_plan' to record your root cause analysis and step-by-step fix.
-5. Use 'propose_patch' to output the final, corrected file content. Do not guess syntax.`
-    },
+5. Use 'propose_patch' to output the final, corrected file content. Do not guess syntax.`;
+
+  let messages: any[] = [
     {
       role: 'user',
       content: "Begin your investigation and fix."
@@ -134,18 +133,16 @@ You MUST follow this exact sequence:
 
   for (let step = 0; step < 7; step++) {
     // @ts-ignore
-    const result = await generateText({ model, messages, tools });
+    const result = await generateText({ model, system: systemPrompt, messages, tools });
     
     if (result.text) {
       accumulatedThoughts += result.text + "\n";
     }
 
-    // Append assistant's response to history
-    messages.push({
-      role: 'assistant',
-      content: result.text || "",
-      toolCalls: result.toolCalls
-    });
+    // Append assistant's response and tool results to history
+    if (result.response && result.response.messages) {
+      messages = messages.concat(result.response.messages);
+    }
 
     if (!result.toolCalls || result.toolCalls.length === 0) {
       break; // No more tool calls, agent is done
@@ -153,19 +150,6 @@ You MUST follow this exact sequence:
 
     if (finalPatch !== "") {
       break; // We got the patch, exit early
-    }
-
-    // Process tool results and append them
-    if (result.toolResults && result.toolResults.length > 0) {
-      messages.push({
-        role: 'tool',
-        content: result.toolResults.map(tr => ({
-          type: 'tool-result',
-          toolCallId: tr.toolCallId,
-          toolName: tr.toolName,
-          result: (tr as any).result
-        }))
-      });
     }
   }
 
