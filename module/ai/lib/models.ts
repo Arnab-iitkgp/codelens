@@ -8,7 +8,7 @@ import { createVertex } from '@ai-sdk/google-vertex';
 
 let currentGoogleKeyIndex = Math.floor(Math.random() * 1000);
 
-function getNextGoogleProvider(forceStandard = false) {
+export function getNextGoogleProvider(forceStandard = false) {
   // 1. GCP Vertex AI (Enterprise Priority)
   if (!forceStandard && process.env.GCP_ENABLED === "true" && process.env.GOOGLE_VERTEX_CREDENTIALS_JSON) {
     try {
