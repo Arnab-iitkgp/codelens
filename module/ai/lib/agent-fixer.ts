@@ -18,7 +18,72 @@ function getAgentModel() {
 }
 
 /**
+ * Pre-gathers deterministic graph context for the agent (D-011: deterministic-first).
+ * Queries the Postgres AST graph for the symbols in the target file,
+ * then fetches callers (blast radius) and callees (dependencies) so the agent
+ * starts with structural awareness instead of blindly searching.
+ */
+async function gatherGraphContext(repoId: string, filePath: string): Promise<string> {
+  try {
+    // Find all symbols in the target file
+    const symbols = await prisma.symbol.findMany({
+      where: { repositoryId: repoId, path: filePath }
+    });
+
+    if (symbols.length === 0) {
+      return "[Graph] No symbols indexed for this file. Use read_file and semantic_search to investigate.";
+    }
+
+    const sections: string[] = [];
+    sections.push(`[Graph] Found ${symbols.length} symbol(s) in ${filePath}:`);
+
+    // For each symbol, get its callers and callees (cap at 8 symbols to keep context tight)
+    for (const sym of symbols.slice(0, 8)) {
+      let section = `\n### ${sym.kind}: ${sym.qualifiedName} (L${sym.startLine}-${sym.endLine})`;
+      if (sym.isExported) section += " [exported]";
+      if (sym.isTest) section += " [test]";
+
+      const callers = await prisma.edge.findMany({
+        where: { repositoryId: repoId, targetSymbolId: sym.id },
+        include: { sourceSymbol: true },
+        take: 5
+      });
+
+      const callees = await prisma.edge.findMany({
+        where: { repositoryId: repoId, sourceSymbolId: sym.id },
+        include: { targetSymbol: true },
+        take: 5
+      });
+
+      if (callers.length > 0) {
+        section += `\n  CALLERS (blast radius — these break if you change this symbol):`;
+        section += callers.map(c => `\n    - ${c.sourceSymbol.qualifiedName} in ${c.sourceSymbol.path} [${c.provenance}]`).join("");
+      }
+
+      if (callees.length > 0) {
+        section += `\n  CALLEES (dependencies this symbol uses):`;
+        section += callees.map(c => `\n    - ${c.targetSymbol.qualifiedName} in ${c.targetSymbol.path} [${c.provenance}]`).join("");
+      }
+
+      if (callers.length === 0 && callees.length === 0) {
+        section += "\n  No graph edges. This symbol is isolated (safe to modify).";
+      }
+
+      sections.push(section);
+    }
+
+    return sections.join("\n");
+  } catch (error: any) {
+    console.error(`[Agent] Graph pre-gather failed: ${error.message}`);
+    return "[Graph] Graph lookup failed. Use read_file and semantic_search to investigate manually.";
+  }
+}
+
+/**
  * Runs a true ReAct (Reasoning + Acting) Agent loop to auto-fix a bug using Graph-Augmentation.
+ * 
+ * Architecture (D-011): Deterministic graph traversal runs FIRST (zero LLM cost),
+ * then the ReAct loop lets the LLM reason on top of that structured evidence.
  */
 export async function runAgenticFixer(
   githubToken: string,
@@ -37,6 +102,12 @@ export async function runAgenticFixer(
   let finalPlan = "";
   let accumulatedThoughts = "";
 
+  // ── Phase 1: Deterministic Context Gathering (zero LLM cost) ──
+  console.log(`[Agent] Phase 1: Gathering graph context from Postgres...`);
+  const graphContext = await gatherGraphContext(repoId, initialFilePath);
+  console.log(`[Agent] Graph context: ${graphContext.length} chars`);
+
+  // ── Phase 2: ReAct Agent Loop (LLM-driven) ──
   const tools = {
     read_file: tool({
       description: 'Read the raw contents of any file from the GitHub repository. Provide "path" (string, e.g. "src/utils.ts").',
@@ -71,7 +142,7 @@ export async function runAgenticFixer(
       },
     }) as any,
     semantic_search: tool({
-      description: 'Search the Pinecone vector database for code related to an abstract concept. Provide "query" (string).',
+      description: 'Search the Pinecone vector database for code related to an abstract concept. Provide "query" (string). Use this ONLY if the graph context above is insufficient.',
       parameters: z.object({ query: z.string() }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ query }) => {
@@ -116,13 +187,26 @@ Your goal is to fix the following bug in the repository ${owner}/${repo}:
 
 The bug is located in file: ${initialFilePath}
 
+=== CODE GRAPH CONTEXT (pre-gathered from Postgres AST — advisory, not ground truth) ===
+${graphContext}
+
+IMPORTANT — how to interpret this graph:
+- [EXTRACTED] edges are PROVEN (derived from explicit imports). Treat as facts.
+- [RESOLVED] edges are HIGH-CONFIDENCE (cross-file heuristics). Treat as likely true.
+- [INFERRED] edges are GUESSES (e.g. from this.service.method() patterns). Treat as hints only.
+- This graph reflects the repo state AT INDEX TIME. The PR may have already modified some callers.
+- Always verify callers by reading the actual files before assuming a dependency is real.
+======================================================================================
+
 You have access to these tools: read_file, query_ast_callers, semantic_search, write_plan, propose_patch.
 
 You MUST follow the ReAct loop:
-1. OBSERVE: Use 'read_file' to read ${initialFilePath} and any other files you need.
-2. INVESTIGATE: Use 'query_ast_callers' to check blast radius, 'semantic_search' to find related code.
+1. OBSERVE: Use 'read_file' to read ${initialFilePath}. The file is the ground truth — the graph is just orientation.
+2. INVESTIGATE: If the graph shows EXTRACTED callers, use 'query_ast_callers' to verify they still exist. Only use 'semantic_search' if the graph is empty or you need abstract concept lookup.
 3. PLAN: Use 'write_plan' to record your root cause analysis and step-by-step fix.
-4. ACT: Use 'propose_patch' to output the corrected code snippet. Do not guess syntax.`;
+4. ACT: Use 'propose_patch' to output the corrected code snippet. Do not guess syntax.
+
+IMPORTANT: Do NOT spend more than 2 steps on semantic_search. The graph and read_file are your primary tools.`;
 
   let messages: any[] = [
     {
@@ -131,7 +215,22 @@ You MUST follow the ReAct loop:
     }
   ];
 
-  for (let step = 0; step < 7; step++) {
+  const MAX_STEPS = 10;
+
+  for (let step = 0; step < MAX_STEPS; step++) {
+    const remaining = MAX_STEPS - step;
+
+    // Inject step-budget awareness so the agent self-regulates
+    if (step > 0) {
+      let nudge = `[System: Step ${step + 1}/${MAX_STEPS} — ${remaining} steps remaining.]`;
+      if (remaining <= 3 && finalPlan === "") {
+        nudge += ` ⚠️ You are running low on steps. You MUST call 'write_plan' now and then 'propose_patch' immediately.`;
+      } else if (remaining <= 2) {
+        nudge += ` 🚨 FINAL WARNING: Call 'propose_patch' NOW or you will fail the task.`;
+      }
+      messages.push({ role: 'user', content: nudge });
+    }
+
     // @ts-ignore
     const result = await generateText({ model, system: systemPrompt, messages, tools });
     

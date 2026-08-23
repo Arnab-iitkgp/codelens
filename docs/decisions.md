@@ -21,7 +21,18 @@ a new architectural choice, add a new entry at the top (newest first) with:
 
 ---
 
-## D-015 · Split-Brain AI Architecture with 4-Layer Circuit Breaker
+## D-016 · Step-Budget Awareness and Deterministic Pre-gathering for ReAct Agent
+- **Date:** 2026-08-23
+- **Status:** accepted
+- **Context:** The Auto-Fix Agent uses a `maxSteps` loop to autonomously research and patch bugs. However, without constraints, ReAct loops often fall into "research spirals" (e.g., repeatedly using `semantic_search` without ever proposing a patch), exhausting token budgets and failing the task. Furthermore, forcing the agent to rely purely on tools for initial context gathering (like `semantic_search`) ignores the powerful Code Knowledge Graph we already built in Postgres.
+- **Decision:** 
+  1. **Deterministic Pre-gathering:** Before the LLM ReAct loop begins, we query the Postgres AST graph (zero LLM cost) for symbols in the target file, along with their callers (blast radius) and callees (dependencies). We inject this structural topology into the System Prompt.
+  2. **Step-Budget Nudging:** We maintain a `MAX_STEPS` (10) counter and inject `[System: Step X/10 — Y steps remaining]` into the user messages during the loop. As steps run out, the system escalates warnings, forcing the agent to call `write_plan` and `propose_patch`.
+  3. **Provenance Transparency:** The system prompt explicitly warns the agent that the injected graph is *advisory* (reflecting index-time state) and explains the difference between `EXTRACTED` (facts) and `INFERRED` (hints) edges.
+- **Alternatives considered:**
+  - *Hard limit (fail on step 7):* Tried previously, caused the agent to silently fail mid-research.
+  - *Pre-injecting full file contents:* Rejected because it pollutes the context window for large files and bypasses the agent's autonomous Observation phase (`read_file`). The graph structural injection provides orientation without bloating context.
+- **Consequences:** The agent behaves vastly more intelligently, completing fixes in 3-4 steps instead of spiraling. It acts deterministically first (using the graph) and agentic second (using tools to fill gaps).
 - **Date:** 2026-08-23
 - **Status:** accepted
 - **Context:** We need a way to route fast, bulk code reviews (The Critic) to cheap models (like Groq or Flash) while routing complex, single-file reasoning tasks (The Auto-Fix Agent) to expensive, highly-intelligent models (like Vertex AI Pro). Furthermore, enterprise users on GCP Vertex AI need a resilient fallback chain if GCP goes down.
