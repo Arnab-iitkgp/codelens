@@ -39,10 +39,8 @@ export async function runAgenticFixer(
 
   const tools = {
     read_file: tool({
-      description: 'Read the raw contents of a file from the GitHub repository.',
-      parameters: z.object({
-        path: z.string().describe('The file path to read (e.g., src/app.ts)'),
-      }),
+      description: 'Read the raw contents of any file from the GitHub repository. Provide "path" (string, e.g. "src/utils.ts").',
+      parameters: z.object({ path: z.string() }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ path }) => {
         try {
@@ -56,7 +54,7 @@ export async function runAgenticFixer(
       },
     }) as any,
     query_ast_callers: tool({
-      description: 'Find other files that call a specific function to prevent breaking dependent code.',
+      description: 'Find other files that call a specific function to prevent breaking dependent code. Provide "symbolName" (string).',
       parameters: z.object({ symbolName: z.string() }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ symbolName }) => {
@@ -73,7 +71,7 @@ export async function runAgenticFixer(
       },
     }) as any,
     semantic_search: tool({
-      description: 'Search the Pinecone vector database for abstract concepts.',
+      description: 'Search the Pinecone vector database for code related to an abstract concept. Provide "query" (string).',
       parameters: z.object({ query: z.string() }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ query }) => {
@@ -88,7 +86,7 @@ export async function runAgenticFixer(
       },
     }) as any,
     write_plan: tool({
-      description: 'Record your root cause analysis and step-by-step plan before writing code.',
+      description: 'Record your root cause analysis and step-by-step plan before writing code. Provide "analysis" (string) and "plan" (string).',
       parameters: z.object({ analysis: z.string(), plan: z.string() }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ analysis, plan }) => {
@@ -98,10 +96,10 @@ export async function runAgenticFixer(
       },
     }) as any,
     propose_patch: tool({
-      description: 'Submit the final fixed snippet for the file.',
+      description: 'Submit the final fixed snippet. Provide "path" (string, file path) and "fixedSnippet" (string, the exact replacement code — only the changed lines, not the full file).',
       parameters: z.object({
-        path: z.string().describe('The path of the file you fixed.'),
-        fixedSnippet: z.string().describe('The exact replacement code snippet. DO NOT output the entire file, only the lines that need to change.'),
+        path: z.string(),
+        fixedSnippet: z.string(),
       }),
       // @ts-ignore: Type inference fails due to zod version mismatch
       execute: async ({ path, fixedSnippet }) => {
@@ -116,13 +114,15 @@ export async function runAgenticFixer(
 Your goal is to fix the following bug in the repository ${owner}/${repo}:
 "${bugFinding}"
 
-You have access to a Postgres AST Graph and a Pinecone Vector Database.
-You MUST follow this exact sequence:
-1. Use 'read_file' to see the exact code in ${initialFilePath}.
-2. If you need to understand callers/dependencies, use 'query_ast_callers'.
-3. If you need to find an abstract concept, use 'semantic_search'.
-4. Use 'write_plan' to record your root cause analysis and step-by-step fix.
-5. Use 'propose_patch' to output the final, corrected file content. Do not guess syntax.`;
+The bug is located in file: ${initialFilePath}
+
+You have access to these tools: read_file, query_ast_callers, semantic_search, write_plan, propose_patch.
+
+You MUST follow the ReAct loop:
+1. OBSERVE: Use 'read_file' to read ${initialFilePath} and any other files you need.
+2. INVESTIGATE: Use 'query_ast_callers' to check blast radius, 'semantic_search' to find related code.
+3. PLAN: Use 'write_plan' to record your root cause analysis and step-by-step fix.
+4. ACT: Use 'propose_patch' to output the corrected code snippet. Do not guess syntax.`;
 
   let messages: any[] = [
     {
