@@ -105,7 +105,22 @@ export const createWebhook = async (owner: string, repo: string) => {
 
   const existingHook = hooks.find(hook => hook.config.url === webhookUrl)
 
+  const REQUIRED_EVENTS = ["push", "pull_request", "issue_comment", "pull_request_review_comment"]
+
   if (existingHook) {
+    // Hooks created before an event was added to REQUIRED_EVENTS would keep the
+    // old subscription forever, so top it up instead of returning early.
+    const missing = REQUIRED_EVENTS.filter(e => !existingHook.events.includes(e))
+    if (missing.length > 0) {
+      console.log(`[github] Updating webhook ${existingHook.id} to add events: ${missing.join(", ")}`)
+      const { data: updated } = await octokit.rest.repos.updateWebhook({
+        owner,
+        repo,
+        hook_id: existingHook.id,
+        events: REQUIRED_EVENTS,
+      })
+      return updated
+    }
     return existingHook
   }
 
@@ -116,7 +131,7 @@ export const createWebhook = async (owner: string, repo: string) => {
       url: webhookUrl,
       content_type: "json"
     },
-    events: ["pull_request", "issue_comment", "pull_request_review_comment"]
+    events: REQUIRED_EVENTS
   });
 
   return data;

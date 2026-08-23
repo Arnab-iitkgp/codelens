@@ -99,6 +99,18 @@ export async function indexCodebase(
   return { total: vectors.length, indexed: validVectors.length, failed };
 }
 
+/**
+ * Pinecone vector id for a symbol. MUST be derived from stable identity
+ * (repo + path + qualifiedName), not the Symbol row's cuid: indexRepo does a
+ * wipe-and-rebuild, so every rebuild mints new cuids and a cuid-based id would
+ * orphan the previous vector instead of overwriting it — leaking a full
+ * duplicate set of symbol vectors into the index on every re-index.
+ * Matches the @@unique([repositoryId, path, qualifiedName]) constraint.
+ */
+function symbolVectorId(repoId: string, path: string, qualifiedName: string): string {
+  return `symbol-${repoId}-${path}-${qualifiedName}`.replace(/[^A-Za-z0-9_.\-]/g, "_");
+}
+
 export async function indexGraphSymbols(
   repoId: string,
   symbols: { id: string; path: string; qualifiedName: string; kind: string; codeBody: string }[]
@@ -114,7 +126,7 @@ export async function indexGraphSymbols(
       try {
         const embedding = await generateEmbedding(truncatedContent);
         return {
-          id: `symbol-${sym.id}`,
+          id: symbolVectorId(repoId, sym.path, sym.qualifiedName),
           values: embedding,
           metadata: {
             type: "symbol",
