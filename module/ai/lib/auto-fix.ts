@@ -15,6 +15,56 @@ import { runAgenticFixer } from "./agent-fixer";
  * Do not export this from a `"use server"` module — that would expose it as an
  * unauthenticated action endpoint.
  */
+/**
+ * Trims untouched leading and trailing context lines from an agent's patch snippet
+ * by comparing it against the original file content at lines [startLine..endLine].
+ */
+export function trimPatchToDelta(
+  originalFileContent: string,
+  patchSnippet: string,
+  startLine: number,
+  endLine: number
+): { patch: string; startLine: number; endLine: number } {
+  if (!originalFileContent || !patchSnippet || startLine > endLine) {
+    return { patch: patchSnippet, startLine, endLine };
+  }
+
+  const originalLines = originalFileContent.split("\n");
+  const patchLines = patchSnippet.split("\n");
+  const targetOriginalLines = originalLines.slice(startLine - 1, endLine);
+
+  let curStart = startLine;
+  let curEnd = endLine;
+
+  // Trim leading matching lines
+  while (
+    patchLines.length > 1 &&
+    targetOriginalLines.length > 0 &&
+    patchLines[0] === targetOriginalLines[0]
+  ) {
+    patchLines.shift();
+    targetOriginalLines.shift();
+    curStart++;
+  }
+
+  // Trim trailing matching lines
+  while (
+    patchLines.length > 1 &&
+    targetOriginalLines.length > 0 &&
+    patchLines[patchLines.length - 1] === targetOriginalLines[targetOriginalLines.length - 1]
+  ) {
+    patchLines.pop();
+    targetOriginalLines.pop();
+    curEnd--;
+  }
+
+  return {
+    patch: patchLines.join("\n"),
+    startLine: curStart,
+    endLine: curEnd,
+  };
+}
+
 export async function runAutoFixAndComment(
   owner: string,
   repo: string,
@@ -42,6 +92,7 @@ export async function runAutoFixAndComment(
     }
 
     const githubToken = repository.user.accounts[0].accessToken;
+    const octokit = new Octokit({ auth: githubToken });
 
     // 2. Run the Agent (Thinks, Plans, Acts)
     const agentResult = await runAgenticFixer(
@@ -62,12 +113,28 @@ export async function runAutoFixAndComment(
       throw new Error(`Agent failed to generate a patch. (Model: ${agentResult.modelUsed}) Last thoughts: ${agentResult.agentThoughts}`);
     }
 
-    // 3. Post the fix as a native GitHub Suggestion Block!
-    const octokit = new Octokit({ auth: githubToken });
+    // 3. Fetch original file content to trim untouched context lines from patch
+    let finalPatch = agentResult.patch;
+    let finalStartLine = startLine;
+    let finalEndLine = endLine;
 
-    // 3a. An inline comment must be attached to the PR's HEAD commit. Read it from
-    // the PR itself — pulls.listCommits is paginated (30/page), so the last entry
-    // of page 1 is not the head commit on larger PRs and yields a 422.
+    try {
+      const { data: fileData } = await octokit.rest.repos.getContent({ owner, repo, path: filePath });
+      if (!Array.isArray(fileData) && 'content' in fileData) {
+        const rawContent = Buffer.from(fileData.content, "base64").toString("utf-8");
+        const trimmed = trimPatchToDelta(rawContent, agentResult.patch, startLine, endLine);
+        finalPatch = trimmed.patch;
+        finalStartLine = trimmed.startLine;
+        finalEndLine = trimmed.endLine;
+        if (finalStartLine !== startLine || finalEndLine !== endLine) {
+          console.log(`[Auto-Fix] Trimmed patch range from L${startLine}-${endLine} -> L${finalStartLine}-${finalEndLine}`);
+        }
+      }
+    } catch (contentErr) {
+      console.warn("[Auto-Fix] Failed to fetch file content for trimming, using raw patch:", contentErr);
+    }
+
+    // 4. Post the fix as a native GitHub Suggestion Block!
     const { data: pullRequest } = await octokit.rest.pulls.get({
       owner,
       repo,
@@ -75,10 +142,8 @@ export async function runAutoFixAndComment(
     });
     const headCommitSha = pullRequest.head.sha;
 
-    // 3b. Format the body with the suggestion block
-    const commentBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.\n\n\`\`\`suggestion\n${agentResult.patch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
+    const commentBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.\n\n\`\`\`suggestion\n${finalPatch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
 
-    // 3c. Post the inline review comment
     await octokit.rest.pulls.createReviewComment({
       owner,
       repo,
@@ -86,8 +151,8 @@ export async function runAutoFixAndComment(
       body: commentBody,
       commit_id: headCommitSha,
       path: filePath,
-      line: endLine, // GitHub attaches the comment to the last line of the block
-      start_line: startLine !== endLine ? startLine : undefined // Only pass start_line if it's a multi-line range
+      line: finalEndLine,
+      start_line: finalStartLine !== finalEndLine ? finalStartLine : undefined
     });
 
     return { success: true };
