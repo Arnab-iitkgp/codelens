@@ -1,6 +1,6 @@
 "use server";
 import { auth } from "@/lib/auth";
-import { getRemainingLimits, updateUserTier } from "@/module/payment/lib/subscription";
+import { getRemainingLimits, updatePolarCustomerId, updateUserTier } from "@/module/payment/lib/subscription";
 import { headers } from "next/headers";
 import { polarClient } from "@/module/payment/config/polar";
 import prisma from "@/lib/db";
@@ -78,31 +78,47 @@ export async function syncSubscriptionStatus() {
         where: { id: session.user.id }
     });
 
-    if (!user || !user.polarCustomerId) {
-        return { success: false, message: "No Polar customer ID found" };
+    if (!user) {
+        return { success: false, message: "User not found" };
     }
 
     try {
+        let customerId = user.polarCustomerId;
+
+        // If polarCustomerId is not saved on the user record, look up by user email in Polar
+        if (!customerId && user.email) {
+            const customerResult = await polarClient.customers.list({
+                email: user.email,
+            });
+            const items = customerResult.result?.items || [];
+            if (items.length > 0) {
+                customerId = items[0].id;
+                await updatePolarCustomerId(user.id, customerId);
+                console.log(`[Polar Sync] Linked customerId ${customerId} for user ${user.email}`);
+            }
+        }
+
+        if (!customerId) {
+            return { success: false, message: "No Polar customer found for your account email." };
+        }
+
         // Fetch subscriptions from Polar
         const result = await polarClient.subscriptions.list({
-            customerId: user.polarCustomerId,
+            customerId: customerId,
         });
 
         const subscriptions = result.result?.items || [];
 
-        // Find the most relevant subscription (active or most recent)
-        const activeSub = subscriptions.find((sub: any) => sub.status === 'active');
-        const latestSub = subscriptions[0]; // Assuming API returns sorted or we should sort
-        console.log(activeSub);
+        // Find active subscription or latest subscription
+        const activeSub = subscriptions.find((sub: any) => sub.status === 'active' || sub.status === 'trialing');
+        const latestSub = subscriptions[0];
 
         if (activeSub) {
             await updateUserTier(user.id, "PRO", "ACTIVE", activeSub.id);
             return { success: true, status: "ACTIVE" };
         } else if (latestSub) {
-            // If latest is canceled/expired
             const status = latestSub.status === 'canceled' ? 'CANCELED' : 'EXPIRED';
-            // Only downgrade if we are sure it's not active
-            if (latestSub.status !== 'active') {
+            if (latestSub.status !== 'active' && latestSub.status !== 'trialing') {
                 await updateUserTier(user.id, "FREE", status, latestSub.id);
             }
             return { success: true, status };
