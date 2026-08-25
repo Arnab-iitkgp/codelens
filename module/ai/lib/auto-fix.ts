@@ -29,12 +29,21 @@ export function trimPatchToDelta(
     return { patch: patchSnippet, startLine, endLine };
   }
 
-  const originalLines = originalFileContent.split("\n");
-  const patchLines = patchSnippet.split("\n");
-  const targetOriginalLines = originalLines.slice(startLine - 1, endLine);
+  // Normalize line endings (\r\n -> \n) so Windows CRLF files match LLM LF output
+  const normalizedOriginal = originalFileContent.replace(/\r\n/g, "\n");
+  const normalizedPatch = patchSnippet.replace(/\r\n/g, "\n");
 
-  let curStart = startLine;
-  let curEnd = endLine;
+  const originalLines = normalizedOriginal.split("\n");
+  const patchLines = normalizedPatch.split("\n");
+
+  // Clamp line bounds safely to avoid array.slice(-1) negative index bugs
+  const safeStart = Math.max(1, startLine);
+  const safeEnd = Math.min(originalLines.length, Math.max(safeStart, endLine));
+
+  const targetOriginalLines = originalLines.slice(safeStart - 1, safeEnd);
+
+  let curStart = safeStart;
+  let curEnd = safeEnd;
 
   // Trim leading matching lines
   while (
