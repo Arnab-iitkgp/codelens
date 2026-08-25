@@ -113,13 +113,26 @@ export async function runAutoFixAndComment(
       throw new Error(`Agent failed to generate a patch. (Model: ${agentResult.modelUsed}) Last thoughts: ${agentResult.agentThoughts}`);
     }
 
-    // 3. Fetch original file content to trim untouched context lines from patch
+    // 3. Get the PR head commit SHA for exact file revision and comment posting
+    const { data: pullRequest } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber
+    });
+    const headCommitSha = pullRequest.head.sha;
+
+    // 4. Fetch original file content AT THE EXACT PR REVISION to trim untouched context lines
     let finalPatch = agentResult.patch;
     let finalStartLine = startLine;
     let finalEndLine = endLine;
 
     try {
-      const { data: fileData } = await octokit.rest.repos.getContent({ owner, repo, path: filePath });
+      const { data: fileData } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: filePath,
+        ref: headCommitSha
+      });
       if (!Array.isArray(fileData) && 'content' in fileData) {
         const rawContent = Buffer.from(fileData.content, "base64").toString("utf-8");
         const trimmed = trimPatchToDelta(rawContent, agentResult.patch, startLine, endLine);
@@ -134,14 +147,7 @@ export async function runAutoFixAndComment(
       console.warn("[Auto-Fix] Failed to fetch file content for trimming, using raw patch:", contentErr);
     }
 
-    // 4. Post the fix as a native GitHub Suggestion Block!
-    const { data: pullRequest } = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: prNumber
-    });
-    const headCommitSha = pullRequest.head.sha;
-
+    // 5. Post the fix as a native GitHub Suggestion Block!
     const commentBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.\n\n\`\`\`suggestion\n${finalPatch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
 
     await octokit.rest.pulls.createReviewComment({
