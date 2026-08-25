@@ -31,12 +31,13 @@ CodeLens is an AI-powered code review tool that automatically analyzes pull requ
 ##  Features
 
 - **Automatic PR Reviews**: Every pull request gets automatically reviewed on commit
-- **AI-Powered Analysis**: Uses Google Gemini to understand context, not just syntax
-- **Line-by-Line Analysis**: Catches bugs, security issues, and risky patterns you might miss
+- **Multi-Agent Verification**: Three independent AI defense agents vote to eliminate false positives
+- **Autonomous Auto-Fix**: A ReAct agent investigates bugs and posts drop-in replacement GitHub suggestion blocks
+- **Graph-Augmented Intelligence**: Parses ASTs (Tree-sitter) into PostgreSQL to map blast radius and dependencies
+- **Split-Brain AI Routing**: Routes fast bulk scans to cheap models (Groq) and complex fixes to frontier models (Vertex Pro) with 4-layer failovers
+- **Agent Trace Timeline**: Fully transparent dashboard to trace the AI's step-by-step reasoning and token usage
 - **GitHub Integration**: Zero setup - works seamlessly with your GitHub repositories
-- **Context-Aware Insights**: Uses RAG (Retrieval-Augmented Generation) for better code understanding
 - **Subscription Management**: Integrated with Polar for subscription handling
-- **Real-time Dashboard**: Track your repositories, reviews, and activity
 
 ##  Tech Stack
 
@@ -44,8 +45,9 @@ CodeLens is an AI-powered code review tool that automatically analyzes pull requ
 - **Language**: TypeScript
 - **UI**: React 19, Tailwind CSS, Shadcn UI
 - **Authentication**: [Better Auth](https://www.better-auth.com/) with GitHub OAuth
-- **Database**: PostgreSQL with [Prisma](https://www.prisma.io/)
-- **AI**: [Google Gemini 2.5 Flash](https://ai.google.dev/) via Vercel AI SDK
+- **Database**: PostgreSQL with [Prisma](https://www.prisma.io/) (storing both relational data and AST graphs)
+- **AI**: Multi-Provider via Vercel AI SDK (Google Vertex AI, Google Studio, OpenAI, Groq)
+- **Code Parsing**: `web-tree-sitter` for multi-language AST symbol extraction
 - **Vector Database**: [Pinecone](https://www.pinecone.io/) for RAG
 - **Background Jobs**: [Inngest](https://www.inngest.com/)
 - **Subscriptions**: [Polar](https://polar.sh/)
@@ -145,23 +147,33 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ##  Key Features Explained
 
 
-### Automatic Code Reviews
+### Graph-Augmented Code Intelligence
+Unlike standard RAG that blindly searches vector blobs, CodeLens parses your repository into a deterministic Abstract Syntax Tree (AST) using `web-tree-sitter`. It extracts Symbols (functions, classes) and Edges (callers, callees) into PostgreSQL. When a PR alters a function, the agent instantly knows the exact "Blast Radius" of files that depend on it.
 
-When a pull request is opened, CodeLens:
-1. Fetches the PR diff from GitHub
-2. Retrieves relevant context from your codebase using RAG
-3. Analyzes the code using Google Gemini AI
-4. Posts detailed review comments directly on the PR
+### Multi-Agent Verification Pipeline
+To guarantee high signal-to-noise ratio, CodeLens employs a Multi-Agent architecture:
+1. **The Investigator**: Deterministically traverses the Code Graph to gather PR context.
+2. **The Prosecutor**: Scans the PR and proposes initial bug findings.
+3. **The Defense (3x)**: Three independent AI critics (Correctness, Security, Runtime) vote to verify or refute the Prosecutor's claims. Only findings that pass a strict majority vote survive.
+4. **The Judge**: Posts the final verified findings to GitHub.
 
-### RAG (Retrieval-Augmented Generation)
+### Autonomous Agentic Auto-Fix
+Instead of just pointing out errors, CodeLens can fix them. Authorized repository owners can trigger the **Auto-Fix Agent** via the dashboard or by commenting `@codelens fix` on a GitHub PR thread.
+Powered by a 10-step ReAct loop and Frontier models (e.g., Vertex AI Pro), the agent:
+1. Reads the file and navigates the AST Graph.
+2. Writes out its root-cause reasoning.
+3. Generates a pristine, structurally-sound drop-in patch, posted directly as a GitHub `suggestion` block.
 
-CodeLens uses Pinecone to store and retrieve code embeddings, allowing the AI to understand your codebase context when reviewing PRs.
+### Split-Brain Provider Routing
+CodeLens natively supports routing different workloads to different LLM providers using strict `door:model` chains (e.g., `AI_REVIEW_CHAIN`, `AI_AGENT_CHAIN`). 
+- Fast, bulk PR scanning is routed to high-speed models (like Groq or Gemini Flash).
+- Complex, single-file autonomous fixing is routed to Frontier models (like Vertex AI Gemini Pro).
+Every layer features zero-downtime, circuit-breaker failovers to guarantee enterprise reliability.
 
 ### Background Processing
-
 Inngest handles asynchronous tasks like:
 - Processing PR reviews
-- Syncing repository data
+- Rebuilding AST Graphs and Vector Indexes
 - Updating subscription status
 
 ## 🚀 Performance Optimizations

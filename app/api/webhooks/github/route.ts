@@ -24,23 +24,45 @@ export async function POST (req:NextRequest){
                 const [owner, repoName] = repo.split("/");
                 
                 // If it's a review comment (has line/path context)
-                if (comment.path && (comment.line || comment.original_line)) {
+                if (comment.path && (comment.line || comment.original_line || comment.in_reply_to_id)) {
                     console.log(`Triggering Auto-Fix for PR #${prNumber} on ${comment.path}`);
                     
-                    // Calls the lib directly: a webhook has no user session, so it
-                    // cannot go through the session-checked executeAutoFix action.
                     const { runAutoFixAndComment } = await import("@/module/ai/lib/auto-fix");
-                    const endLine = comment.original_line || comment.line;
-                    const startLine = comment.original_start_line || comment.start_line || endLine;
+                    const { getAccessToken } = await import("@/module/github/lib/github");
+                    const { Octokit } = await import("octokit");
+
+                    let findingText = comment.body.replace("@codelens fix", "").trim() || "User requested Auto-Fix via comment mention.";
+                    let targetEndLine = comment.original_line || comment.line || 1;
+                    let targetStartLine = comment.original_start_line || comment.start_line || targetEndLine;
+
+                    // If this is a reply to an existing CodeLens finding comment, fetch parent for exact context
+                    if (comment.in_reply_to_id) {
+                        try {
+                            const token = await getAccessToken();
+                            const octokit = new Octokit({ auth: token });
+                            const { data: parentComment } = await octokit.rest.pulls.getReviewComment({
+                                owner,
+                                repo: repoName,
+                                comment_id: comment.in_reply_to_id,
+                            });
+
+                            if (parentComment?.body) {
+                                findingText = `Original Bug Finding:\n${parentComment.body}`;
+                                targetEndLine = parentComment.original_line || parentComment.line || targetEndLine;
+                                targetStartLine = parentComment.original_start_line || parentComment.start_line || targetEndLine;
+                                console.log(`Resolved parent comment context for L${targetStartLine}-${targetEndLine}`);
+                            }
+                        } catch (parentErr) {
+                            console.warn("Failed to fetch parent comment context, using reply context:", parentErr);
+                        }
+                    }
 
                     // Fire and forget so we don't block the webhook response
-                    runAutoFixAndComment(owner, repoName, prNumber, comment.path, "User requested Auto-Fix via comment mention.", startLine, endLine)
+                    runAutoFixAndComment(owner, repoName, prNumber, comment.path, findingText, targetStartLine, targetEndLine)
                         .catch(err => console.error("Webhook Auto-Fix Failed:", err));
                         
                 } else {
                     console.log("Mentioned on a general comment without file context.");
-                    // In a production app, we would use Octokit here to reply:
-                    // "Please mention me in reply to an actual CodeLens inline bug finding!"
                 }
             }
             return NextResponse.json({msg:"comment processed"},{status:200});

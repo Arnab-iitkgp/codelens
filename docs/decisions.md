@@ -21,6 +21,24 @@ a new architectural choice, add a new entry at the top (newest first) with:
 
 ---
 
+## D-019 · Deterministic Patch Trimming & Inline Comment Anchor Precision
+- **Date:** 2026-08-25
+- **Status:** accepted
+- **Context:** Two core precision issues affected PR inline code reviews and `@codelens fix` auto-suggestions:
+  1. **Inline Review Comments Anchoring Cut-off:** `github.ts` set `line: finding.startLine` and ignored `endLine` / `start_line`. In GitHub's REST API, `line` specifies the *end line* of the comment box anchor. Setting `line` to `startLine` (line 30) caused GitHub to attach the comment below line 30, pushing line 31 (`return 1;`) below the comment box and hiding the bug line from the diff preview box.
+  2. **Webhook Context Blindness & Suggestion Bloat:** Webhook mentions of `@codelens fix` did not fetch parent review comments via `in_reply_to_id`, forcing the agent to operate on placeholder text and inherit broad line ranges. Furthermore, the agent replacement contract returned full chunk blocks, causing GitHub suggestion blocks to replace 20+ lines when only 1 line changed.
+- **Decision:**
+  1. **GitHub Comment Anchor Mapping:** Update `postInlineReview()` in `github.ts` to map `line: finding.endLine` and pass `start_line: finding.startLine !== finding.endLine ? finding.startLine : undefined`.
+  2. **Webhook Parent Resolution:** Query `comment.in_reply_to_id` with Octokit to extract the original bug claim, evidence, and exact line numbers from the parent review comment before booting the Auto-Fix agent.
+  3. **Deterministic Patch Trimming:** Implement `trimPatchToDelta()` in `auto-fix.ts`. In pure TypeScript (0 extra LLM calls), compare the agent's patch against the target file's raw content to strip matching leading/trailing context lines and update `startLine`/`endLine` before calling GitHub's API.
+  4. **Range Delta Preservation:** Update `performExistenceChecks()` in `engine.ts` to preserve `lineDelta = finding.endLine - finding.startLine` during line snapping.
+- **Alternatives considered:**
+  - *Restricting LLM ReAct agent output:* Would force the LLM to guess line numbers or output incomplete code without surrounding context, increasing syntax errors.
+  - *Hardcoding single-line replacement:* Fails for multi-line bug fixes.
+- **Consequences:** The agent retains 100% full file context for deep reasoning during the ReAct loop, but GitHub receives a minimal, pinpoint 1-line suggestion block. Inline comments now anchor cleanly to `endLine` showing all relevant buggy lines inside the preview box.
+
+---
+
 ## D-018 · Per-role provider chains in env, replacing the global `GCP_ENABLED` switch
 - **Date:** 2026-08-23
 - **Status:** accepted

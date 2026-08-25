@@ -221,14 +221,16 @@
 
 ## Outstanding on the Auto-Fix / review path (found 2026-08-23, not yet fixed)
 
-| Issue | Location | Impact |
-| ----- | -------- | ------ |
-| `@codelens fix` passes a placeholder finding | `app/api/webhooks/github/route.ts:35` | The agent is told only the file path, never the bug. Should read the parent comment body via `in_reply_to_id`. |
-| Webhook does not verify `x-hub-signature-256` | `app/api/webhooks/github/route.ts` | Anyone who can POST to the endpoint can trigger reviews, re-indexing, and Auto-Fix runs. |
-| `performExistenceChecks` collapses `endLine` to `startLine` when snapping | `module/review/lib/engine.ts:308` | A snapped multi-line finding becomes a single-line suggestion range, so the agent's multi-line patch replaces one line. |
-| `ENABLE_AGENTIC_FIXER` documented but absent | — | No kill switch for the agent. |
-| Deleted/renamed symbols leave stale Pinecone vectors | `module/ai/lib/rag.ts` | Deterministic ids stop duplicates on re-index but do not remove vectors whose symbol no longer exists. Needs a delete pass. |
-| N+1 queries in the investigator | `module/review/lib/investigator.ts:36` | Re-fetches all symbols per chunk of the same file, then per-symbol caller/callee queries. |
+| Issue | Location | Impact | Status |
+| ----- | -------- | ------ | ------ |
+| `@codelens fix` passes a placeholder finding | `app/api/webhooks/github/route.ts:35` | The agent is told only the file path, never the bug. | ✅ Resolved (Fetches parent comment via `in_reply_to_id`) |
+| Inline comment anchor cut-off | `module/github/lib/github.ts:316` | Comments anchored to `startLine` (30) cut off line 31 from preview box. | ✅ Resolved (Anchors to `endLine` + `start_line`) |
+| GitHub suggestion block context bloat | `module/ai/lib/auto-fix.ts` | Suggestion replaces 20+ lines when 1 line changes. | ✅ Resolved (`trimPatchToDelta` strips unchanged lines) |
+| `performExistenceChecks` collapses `endLine` to `startLine` when snapping | `module/review/lib/engine.ts:308` | A snapped multi-line finding becomes a single-line suggestion range. | ✅ Resolved (Preserves `endLine - startLine` range delta) |
+| Webhook does not verify `x-hub-signature-256` | `app/api/webhooks/github/route.ts` | Anyone who can POST to the endpoint can trigger reviews, re-indexing, and Auto-Fix runs. | Open |
+| `ENABLE_AGENTIC_FIXER` documented but absent | — | No kill switch for the agent. | Open |
+| Deleted/renamed symbols leave stale Pinecone vectors | `module/ai/lib/rag.ts` | Deterministic ids stop duplicates on re-index but do not remove vectors whose symbol no longer exists. Needs a delete pass. | Open |
+| N+1 queries in the investigator | `module/review/lib/investigator.ts:36` | Re-fetches all symbols per chunk of the same file, then per-symbol caller/callee queries. | Open |
 
 ---
 
@@ -238,4 +240,13 @@
 - [ ] `web-tree-sitter` WASM file serving in Next.js serverless — needs testing
 - [ ] Pinecone migration strategy: side-by-side (`type: symbol` vs `type: chunk`) or wipe and re-index?
 - [ ] Which Groq models reliably support `generateObject` structured output for the ReAct agent?
+
+---
+
+### 2026-08-25 — Inline Review Comment Anchoring, Webhook Parent Resolution & Patch Trimming
+- **Fixed Inline Review Comment Anchoring (`module/github/lib/github.ts`)**: `postInlineReview()` was setting `line: finding.startLine` and omitting `start_line` / `endLine`. In GitHub's REST API, `line` represents the *end line* of the comment box anchor. Setting `line` to `startLine` (line 30) caused GitHub to attach the comment below line 30, pushing line 31 (`return 1;`) below the comment box and hiding the bug line from the diff preview box. Updated `github.ts` to map `line: finding.endLine` and pass `start_line: finding.startLine !== finding.endLine ? finding.startLine : undefined`. Verified via `scratch/test-inline-anchor.ts`.
+- **Fixed Webhook Parent Comment Context Resolution (`app/api/webhooks/github/route.ts`)**: When `@codelens fix` is triggered via comment mention, the webhook handler now checks for `comment.in_reply_to_id` and uses Octokit to fetch the parent review comment body and line numbers. The Auto-Fix agent receives the exact bug claim/evidence and precise line range rather than a placeholder string. Verified via `scratch/test-webhook-parent.ts`.
+- **Implemented Deterministic Patch Trimmer (`module/ai/lib/auto-fix.ts`)**: Added `trimPatchToDelta()` in pure TypeScript. Before posting the suggestion comment to GitHub, the trimmer compares the agent's patch against the original file content at `[startLine..endLine]`, stripping identical leading and trailing context lines and updating `startLine`/`endLine`. The agent maintains 100% full file context during ReAct reasoning, but GitHub receives a minimal 1-line suggestion block (`return false;` at line 31). Verified via `scratch/test-patch-trimmer.ts`.
+- **Preserved Range Deltas in Existence Checks (`module/review/lib/engine.ts`)**: Updated `performExistenceChecks()` to preserve `lineDelta = finding.endLine - finding.startLine` when snapping hallucinated line numbers to valid diff hunks. Verified via `scratch/test-existence-checks.ts`.
+- **Production Build Check**: Ran `bun run build` — compiled successfully in 49s with 0 TypeScript/Turbopack errors across all 17 routes.
 

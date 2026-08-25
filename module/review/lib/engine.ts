@@ -334,8 +334,9 @@ function performExistenceChecks(
     // This allows findings on 'context' lines that fell just outside the 3-line patch window to survive!
     if (Math.abs(closestLine - finding.startLine) <= 25) {
       console.log(`[Existence Check] Snapping line ${finding.startLine} -> ${closestLine} for ${finding.file}`);
+      const lineDelta = Math.max(0, finding.endLine - finding.startLine);
       finding.startLine = closestLine;
-      finding.endLine = closestLine;
+      finding.endLine = closestLine + lineDelta;
       return true;
     }
     

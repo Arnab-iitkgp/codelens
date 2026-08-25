@@ -311,9 +311,12 @@ export const postInlineReview = async (
     commentBody += `**Evidence:** ${finding.evidence}\n\n`;
     commentBody += `**Suggestion:** ${finding.suggestion}`;
 
+    const isMultiLine = finding.startLine !== finding.endLine && finding.startLine > 0;
+
     return {
       path: finding.file,
-      line: finding.startLine, // GitHub API needs exactly 'line' for a single-line comment
+      line: finding.endLine, // GitHub API uses 'line' as the end line of the comment anchor
+      ...(isMultiLine ? { start_line: finding.startLine } : {}),
       body: commentBody
     };
   });
