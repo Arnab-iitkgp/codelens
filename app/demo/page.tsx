@@ -781,11 +781,11 @@ export default function DemoPage() {
                     <ShieldAlert className={`h-3.5 w-3.5 ${outputTab === "findings" ? "text-amber-500" : ""}`} />
                     Issues List
                     <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] leading-none ${outputTab === "findings" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted text-muted-foreground"}`}>
-                      {structuredData?.inlineFindings?.length || 0}
+                      {(structuredData?.findings?.length || structuredData?.inlineFindings?.length || 0)}
                     </span>
                     
                     {/* Try Auto-Fix Tooltip on the Issues List Tab */}
-                    {!hasClickedFindings && status === "completed" && structuredData?.inlineFindings?.length > 0 && (
+                    {!hasClickedFindings && status === "completed" && (structuredData?.findings?.length || structuredData?.inlineFindings?.length || 0) > 0 && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded shadow-lg whitespace-nowrap animate-bounce flex items-center gap-1 z-[60] before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-[4px] before:border-transparent before:border-t-primary pointer-events-none">
                         Try Auto-Fix
                       </div>
@@ -1023,145 +1023,152 @@ export default function DemoPage() {
                       </p>
                     </div>
 
-                    {structuredData?.inlineFindings && structuredData.inlineFindings.length > 0 ? (
-                      <div className="space-y-3">
-                        {structuredData.inlineFindings.map((finding: any, i: number) => {
-                          const severityColor = 
-                            finding.severity === "critical"
-                              ? "bg-red-500/10 text-red-500 border-red-500/30"
-                              : finding.severity === "warning"
-                              ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                              : "bg-blue-500/10 text-blue-500 border-blue-500/30";
+                    {(() => {
+                      const activeFindings = structuredData?.findings || structuredData?.inlineFindings || [];
+                      if (activeFindings.length === 0) {
+                        return (
+                          <div className="p-8 text-center border rounded-lg bg-muted/20 text-muted-foreground text-sm flex flex-col items-center">
+                            <CheckCircle2 className="h-8 w-8 text-green-500 mb-3 opacity-80" />
+                            🎉 Clean bill of health! No critical issues or bugs survived the verification pass.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="space-y-3">
+                          {activeFindings.map((rawFinding: any, i: number) => {
+                            const findingId = rawFinding.id || `f-${i}`;
+                            const filePath = rawFinding.path || rawFinding.file || "api.ts";
+                            const startLine = rawFinding.startLine || rawFinding.line || 1;
+                            const endLine = rawFinding.endLine || rawFinding.line || startLine;
+                            const claimText = rawFinding.claim || rawFinding.comment || rawFinding.title || "Issue detected";
+                            const evidenceText = rawFinding.evidence || (Array.isArray(rawFinding.snippet) ? rawFinding.snippet.join("\n") : rawFinding.snippet || "");
+                            const snippetLines = evidenceText ? evidenceText.split("\n") : null;
+                            const suggestionText = rawFinding.suggestion || "";
 
-                          return (
-                            <div 
-                              key={i} 
-                              className="border rounded-md bg-[#0d1117] shadow-sm overflow-hidden text-[#c9d1d9] font-sans border-[#30363d] mb-4"
-                            >
-                              {/* GitHub Header: File Name */}
-                              <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs font-mono text-[#8b949e] flex items-center justify-between cursor-pointer hover:text-blue-400 transition-colors" onClick={() => openFile(finding.path)}>
-                                <div className="flex items-center gap-2">
-                                  <ChevronDown className="h-3 w-3" />
-                                  <span>{finding.path}</span>
-                                </div>
-                                <span className="text-[10px]">Comment on lines {finding.startLine || finding.line} to {finding.line}</span>
-                              </div>
-                              
-                              {/* Code Snippet Area */}
-                              <div className="bg-[#0d1117] font-mono text-[12px] border-b border-[#30363d] overflow-x-auto">
-                                {finding.snippet ? (
-                                  <table className="w-full border-collapse">
-                                    <tbody>
-                                      {finding.snippet.map((lineText: string, idx: number) => {
-                                        const lnum = (finding.startLine || finding.line) + idx;
-                                        return (
-                                          <tr key={idx} className="hover:bg-[#161b22]">
-                                            <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
-                                            <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
-                                            <td className="pl-3 whitespace-pre text-[#c9d1d9]">{lineText}</td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                ) : (
-                                  <div className="p-3 italic text-[#8b949e]">Context omitted</div>
-                                )}
-                              </div>
-                              
-                              {/* Comment Body */}
-                              <div className="p-3">
-                                {/* Comment Header */}
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-6 h-6 rounded-full overflow-hidden bg-[#27272a] border border-[#30363d] flex items-center justify-center p-0.5">
-                                    <img src="/codelens-logo.png" alt="CodeLens" className="w-full h-full object-contain" />
+                            return (
+                              <div 
+                                key={findingId} 
+                                className="border rounded-md bg-[#0d1117] shadow-sm overflow-hidden text-[#c9d1d9] font-sans border-[#30363d] mb-4"
+                              >
+                                {/* GitHub Header: File Name */}
+                                <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs font-mono text-[#8b949e] flex items-center justify-between cursor-pointer hover:text-blue-400 transition-colors" onClick={() => openFile(filePath)}>
+                                  <div className="flex items-center gap-2">
+                                    <ChevronDown className="h-3 w-3" />
+                                    <span>{filePath}</span>
                                   </div>
-                                  <span className="text-[13px] font-semibold text-[#c9d1d9]">CodeLens Agent</span>
-                                  <span className="text-[12px] text-[#8b949e]">just now</span>
-                                  <span className="ml-auto text-[10px] border border-[#30363d] px-1.5 py-0.5 rounded-full text-[#8b949e]">Author</span>
+                                  <span className="text-[10px]">Comment on lines {startLine} to {endLine}</span>
                                 </div>
                                 
-                                {/* Markdown Body & Auto-Fix Button */}
-                                <div className="text-[13px] text-[#c9d1d9] mb-3 ml-8 leading-relaxed">
-                                  <div dangerouslySetInnerHTML={{ __html: finding.comment.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                                  
-                                  {fixingStatus[finding.id] !== 'done' && (
-                                    <div className="mt-3 relative inline-block">
-                                      <Button 
-                                        size="sm" 
-                                        className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
-                                        onClick={() => handleAutoFixMock(finding.id, finding.path)}
-                                        disabled={fixingStatus[finding.id] === 'running'}
-                                      >
-                                        {fixingStatus[finding.id] === 'running' ? (
-                                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating patch...</>
-                                        ) : (
-                                          <><TerminalSquare className="h-3.5 w-3.5" /> Auto-Fix</>
-                                        )}
-                                      </Button>
-                                    </div>
+                                {/* Code Snippet Area */}
+                                <div className="bg-[#0d1117] font-mono text-[12px] border-b border-[#30363d] overflow-x-auto">
+                                  {snippetLines && snippetLines.length > 0 ? (
+                                    <table className="w-full border-collapse">
+                                      <tbody>
+                                        {snippetLines.map((lineText: string, idx: number) => {
+                                          const lnum = startLine + idx;
+                                          return (
+                                            <tr key={idx} className="hover:bg-[#161b22]">
+                                              <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
+                                              <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
+                                              <td className="pl-3 whitespace-pre text-[#c9d1d9]">{lineText}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <div className="p-3 italic text-[#8b949e]">Context omitted</div>
                                   )}
                                 </div>
                                 
-                                {/* Agent Fake Terminal Logs */}
-                                {fixingStatus[finding.id] === 'running' && agentLogs[finding.id] && (
-                                  <div className="ml-8 mb-3 p-3 rounded-md bg-[#010409] border border-[#30363d] font-mono text-[11px] text-[#8b949e] space-y-1">
-                                    {agentLogs[finding.id].map((log, lidx) => (
-                                      <div key={lidx}>{log}</div>
-                                    ))}
-                                    <div className="animate-pulse">_</div>
+                                {/* Comment Body */}
+                                <div className="p-3">
+                                  {/* Comment Header */}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-6 h-6 rounded-full overflow-hidden bg-[#27272a] border border-[#30363d] flex items-center justify-center p-0.5">
+                                      <img src="/codelens-logo.png" alt="CodeLens" className="w-full h-full object-contain" />
+                                    </div>
+                                    <span className="text-[13px] font-semibold text-[#c9d1d9]">CodeLens Agent</span>
+                                    <span className="text-[12px] text-[#8b949e]">just now</span>
+                                    <span className="ml-auto text-[10px] border border-[#30363d] px-1.5 py-0.5 rounded-full text-[#8b949e]">Author</span>
                                   </div>
-                                )}
-                                
-                                {/* Suggestion Block */}
-                                {finding.suggestion && fixingStatus[finding.id] === 'done' && (
-                                  <div className="ml-8 border border-[#30363d] rounded-md overflow-hidden bg-[#0d1117] mb-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs text-[#8b949e] flex justify-between items-center">
-                                      <span>Suggested change</span>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                      <table className="w-full font-mono text-[12px] border-collapse">
-                                        <tbody>
-                                          {/* Show old lines in red if snippet exists, else just show suggestion in green */}
-                                          {finding.snippet && finding.snippet.map((lineText: string, idx: number) => {
-                                            const lnum = (finding.startLine || finding.line) + idx;
-                                            return (
-                                              <tr key={`old-${idx}`} className="bg-[#ffebe9] dark:bg-[#ffebe9]/10">
-                                                <td className="w-10 text-right pr-2 select-none text-[#ff8182] border-r border-[#ff8182]/30">{lnum}</td>
-                                                <td className="w-8 text-center select-none text-[#ff8182] border-r border-[#ff8182]/30">-</td>
-                                                <td className="pl-3 whitespace-pre text-[#ff7b72]">{lineText}</td>
-                                              </tr>
-                                            );
-                                          })}
-                                          {finding.suggestion.split('\n').map((lineText: string, idx: number) => {
-                                            const lnum = (finding.startLine || finding.line) + idx;
-                                            return (
-                                              <tr key={`new-${idx}`} className="bg-[#e6ffec] dark:bg-[#e6ffec]/10">
-                                                <td className="w-10 text-right pr-2 select-none text-[#3fb950] border-r border-[#3fb950]/30">{lnum}</td>
-                                                <td className="w-8 text-center select-none text-[#3fb950] border-r border-[#3fb950]/30">+</td>
-                                                <td className="pl-3 whitespace-pre text-[#7ee787]">{lineText}</td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                    <div className="bg-[#161b22] px-3 py-2 border-t border-[#30363d] flex justify-end gap-2">
-                                      <Button size="sm" variant="outline" className="h-7 text-[11px] px-3 bg-[#21262d] border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9]" onClick={() => toast.success("Suggestion applied to codebase!")}>Apply suggestion</Button>
-                                    </div>
+                                  
+                                  {/* Markdown Body & Auto-Fix Button */}
+                                  <div className="text-[13px] text-[#c9d1d9] mb-3 ml-8 leading-relaxed">
+                                    <div dangerouslySetInnerHTML={{ __html: claimText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                    
+                                    {fixingStatus[findingId] !== 'done' && (
+                                      <div className="mt-3 relative inline-block">
+                                        <Button 
+                                          size="sm" 
+                                          className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                                          onClick={() => handleAutoFixMock(findingId, filePath)}
+                                          disabled={fixingStatus[findingId] === 'running'}
+                                        >
+                                          {fixingStatus[findingId] === 'running' ? (
+                                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating patch...</>
+                                          ) : (
+                                            <><TerminalSquare className="h-3.5 w-3.5" /> Auto-Fix</>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                  
+                                  {/* Agent Fake Terminal Logs */}
+                                  {fixingStatus[findingId] === 'running' && agentLogs[findingId] && (
+                                    <div className="ml-8 mb-3 p-3 rounded-md bg-[#010409] border border-[#30363d] font-mono text-[11px] text-[#8b949e] space-y-1">
+                                      {agentLogs[findingId].map((log, lidx) => (
+                                        <div key={lidx}>{log}</div>
+                                      ))}
+                                      <div className="animate-pulse">_</div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Suggestion Block */}
+                                  {suggestionText && fixingStatus[findingId] === 'done' && (
+                                    <div className="ml-8 border border-[#30363d] rounded-md overflow-hidden bg-[#0d1117] mb-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                      <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs text-[#8b949e] flex justify-between items-center">
+                                        <span>Suggested change</span>
+                                      </div>
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full font-mono text-[12px] border-collapse">
+                                          <tbody>
+                                            {snippetLines && snippetLines.map((lineText: string, idx: number) => {
+                                              const lnum = startLine + idx;
+                                              return (
+                                                <tr key={`old-${idx}`} className="bg-[#ffebe9] dark:bg-[#ffebe9]/10">
+                                                  <td className="w-10 text-right pr-2 select-none text-[#ff8182] border-r border-[#ff8182]/30">{lnum}</td>
+                                                  <td className="w-8 text-center select-none text-[#ff8182] border-r border-[#ff8182]/30">-</td>
+                                                  <td className="pl-3 whitespace-pre text-[#ff7b72]">{lineText}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                            {suggestionText.split('\n').map((lineText: string, idx: number) => {
+                                              const lnum = startLine + idx;
+                                              return (
+                                                <tr key={`new-${idx}`} className="bg-[#e6ffec] dark:bg-[#e6ffec]/10">
+                                                  <td className="w-10 text-right pr-2 select-none text-[#3fb950] border-r border-[#3fb950]/30">{lnum}</td>
+                                                  <td className="w-8 text-center select-none text-[#3fb950] border-r border-[#3fb950]/30">+</td>
+                                                  <td className="pl-3 whitespace-pre text-[#7ee787]">{lineText}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <div className="bg-[#161b22] px-3 py-2 border-t border-[#30363d] flex justify-end gap-2">
+                                        <Button size="sm" variant="outline" className="h-7 text-[11px] px-3 bg-[#21262d] border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9]" onClick={() => toast.success("Suggestion applied to codebase!")}>Apply suggestion</Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center border rounded-lg bg-muted/20 text-muted-foreground text-sm flex flex-col items-center">
-                        <CheckCircle2 className="h-8 w-8 text-green-500 mb-3 opacity-80" />
-                        🎉 Clean bill of health! No critical issues or bugs survived the verification pass.
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </>

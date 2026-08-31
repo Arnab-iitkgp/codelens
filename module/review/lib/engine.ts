@@ -265,8 +265,17 @@ function formatReviewAsMarkdown(review: ReviewOutput, changedLines = 0): string 
   parts.push(`## Summary\n${review.summary}\n`);
   parts.push(`## Walkthrough\n${review.walkthrough}\n`);
 
-  if (review.sequenceDiagram) {
-    parts.push(`## Flow\n\`\`\`mermaid\n${review.sequenceDiagram}\n\`\`\`\n`);
+  if (review.sequenceDiagram && review.sequenceDiagram.trim() !== "") {
+    let cleanDiagram = review.sequenceDiagram.trim();
+    cleanDiagram = cleanDiagram
+      .replace(/^```mermaid\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```$/i, "")
+      .trim();
+
+    if (cleanDiagram) {
+      parts.push(`## Flow\n\`\`\`mermaid\n${cleanDiagram}\n\`\`\`\n`);
+    }
   }
 
   if (review.strengths.length > 0) {
@@ -431,7 +440,7 @@ ${buildStructureView(diff)}
 Write a concise whole-PR narrative using the JSON schema.
 - 'summary': at most 3 sentences on what this PR does overall.
 - 'walkthrough': one short line per file, in the form "path — what changed". No preamble, no conclusion.
-- 'sequenceDiagram': a Mermaid sequenceDiagram ONLY if the change clearly alters a runtime flow across components. Otherwise return an empty string.
+- 'sequenceDiagram': A valid Mermaid sequence diagram (starting with 'sequenceDiagram' syntax) visualizing the key interaction or execution flow modified by this PR. Keep it concise (3-6 lines). Return empty string only if no logic flows exist in the changed files. Do not include markdown code block backticks in the string.
 Do not speculate about bugs — a separate pass handles findings.`;
 
   try {
