@@ -233,7 +233,7 @@ export default function DemoPage() {
       }
 
       const data = await res.json();
-      setDemoReviewId(data.demoReviewId);
+      setDemoReviewId(data.demoReviewId || data.id);
       
     } catch (e: any) {
       console.error(e);
