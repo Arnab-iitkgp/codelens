@@ -3,6 +3,8 @@ import prisma from "@/lib/db";
 import { Octokit } from "octokit";
 import { runReview } from "@/module/review/lib/engine";
 
+import { postInlineReview } from "@/module/github/lib/github";
+
 const DEMO_BRANCH_PREFIX = "demo-review-";
 
 export const generateDemoReview = inngest.createFunction(
@@ -176,13 +178,15 @@ export const generateDemoReview = inngest.createFunction(
     });
 
     await step.run("post-demo-comment", async () => {
-      const octokit = new Octokit({ auth: token });
-      await octokit.rest.issues.createComment({
+      await postInlineReview(
+        token,
         owner,
         repo,
-        issue_number: prNumber,
-        body: `## Automated Code Review\n\n${reviewResult.output}\n\n*This review was generated automatically by CodeLens Demo.*`,
-      });
+        prNumber,
+        reviewResult.structured,
+        reviewResult.output,
+        reviewResult.meta.changedLines
+      );
     });
 
     // Step 5: Store the review output, trace data, and structured findings

@@ -1043,7 +1043,7 @@ export default function DemoPage() {
                             const claimText = rawFinding.claim || rawFinding.comment || rawFinding.title || "Issue detected";
                             const evidenceText = rawFinding.evidence || (Array.isArray(rawFinding.snippet) ? rawFinding.snippet.join("\n") : rawFinding.snippet || "");
                             const snippetLines = evidenceText ? evidenceText.split("\n") : null;
-                            const suggestionText = rawFinding.suggestion || "";
+                            const suggestionText = rawFinding.suggestion || structuredData?.fixes?.[findingId]?.patch || "";
 
                             return (
                               <div 
