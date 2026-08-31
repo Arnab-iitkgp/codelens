@@ -72,15 +72,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const structured = (demoReview.structured as StructuredReview | null) || {};
-    const findings: DemoReviewFinding[] = structured.inlineFindings || [];
+    const structured = (demoReview.structured as (StructuredReview & { findings?: DemoReviewFinding[] }) | null) || {};
+    const findings: DemoReviewFinding[] = structured.findings || structured.inlineFindings || [];
 
     // Find the matching finding or build fallback text
     const finding = findings.find((f) => String(f.id) === String(findingId)) || findings[0];
 
-    const filePath = finding?.path || "api.ts";
+    const filePath = finding?.path || (finding as any)?.file || "api.ts";
     const startLine = finding?.startLine || finding?.line || 1;
-    const endLine = finding?.endLine || finding?.line || 10;
+    const endLine = finding?.endLine || finding?.line || startLine;
     // NOTE: We intentionally omit `finding.suggestion` here.
     // The Flash reviewer's suggestion is a shallow triage hint — feeding it to
     // the Pro agent causes anchoring bias: the agent pattern-matches the hint

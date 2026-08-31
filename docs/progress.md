@@ -263,5 +263,10 @@
   - Created `inngest/functions/demo-fix.ts` using `chainRole: "review"` (routing via fast, cost-efficient Flash models) and registered it in `app/api/inngest/route.ts`.
   - Created `app/api/demo/fix/route.ts` API route with IP rate-limiting and validation against `DemoReview` records.
   - Connected `app/demo/page.tsx` Auto-Fix button to hit the `/api/demo/fix` endpoint. `npx tsc --noEmit` clean (0 errors).
+### 2026-08-31 — Demo Pipeline Findings Normalization, Mermaid Diagrams & Tooltip Fix
+- **Normalized Demo Findings Schema (`app/demo/page.tsx`)**: Fixed object property key mismatch where engine output (`structuredData.findings`) was missed by frontend looking for `inlineFindings`. Added `activeFindings = structuredData?.findings || structuredData?.inlineFindings || []` helper and property normalization (`path/file`, `claim/comment/title`, `evidence/snippet`).
+- **Restored Issues List Counter & Tooltip**: With `activeFindings` normalized, the tab badge now accurately displays the count (e.g., `1` bug found), and the animated **"Try Auto-Fix"** tooltip notification appears automatically upon review completion.
+- **Enhanced Mermaid Flow Diagram Generation (`module/review/lib/engine.ts`)**: Updated `generateNarrative` prompt to request a concise Mermaid `sequenceDiagram` for changed logic flow. Added fence sanitization (`replace(/^```mermaid\s*/i, "")`) in `formatReviewAsMarkdown` to guarantee valid markdown diagram blocks.
+- **Type Safety**: Verified zero TypeScript compilation errors (`npx tsc --noEmit` exit code 0).
 
 
