@@ -67,9 +67,14 @@ export async function POST(req: NextRequest) {
     const filePath = finding?.path || "api.ts";
     const startLine = finding?.startLine || finding?.line || 1;
     const endLine = finding?.endLine || finding?.line || 10;
+    // NOTE: We intentionally omit `finding.suggestion` here.
+    // The Flash reviewer's suggestion is a shallow triage hint — feeding it to
+    // the Pro agent causes anchoring bias: the agent pattern-matches the hint
+    // instead of reasoning from `read_file`. Passing only the claim forces a
+    // real ReAct investigation loop.
     const findingText = finding
-      ? `[${finding.severity || "CRITICAL"}] ${finding.claim || "Issue detected"}: ${finding.reasoning || ""} Suggested fix: ${finding.suggestion || ""}`
-      : "Automated patch generation requested.";
+      ? `[${(finding.severity || "BUG").toUpperCase()}] ${finding.claim || "Issue detected"}${finding.reasoning ? `. ${finding.reasoning}` : ""}`
+      : "A potential issue was detected at the specified location. Investigate with read_file.";
 
     // Trigger Inngest background event
     await inngest.send({
