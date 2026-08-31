@@ -257,4 +257,11 @@
   - Visualized Step 1 Investigator context retrieval chunks, Prosecutor vs. 3x Defense Agent voting matrix (showing kept vs. rejected false positives), and grounded findings.
   - Added structured finding cards with severity badges, category labels, vote counts, blast radius indicators, and an interactive **"Auto-Fix with AI"** button.
 - **Branch & Type Safety**: Verified 0 TypeScript errors with `bunx tsc --noEmit` on the new `demo-page` branch.
+- **Implemented Real Backend Auto-Fix for Demo Playground**:
+  - Extended `runAgenticFixer` and `runAutoFixAndComment` to take a `chainRole: Role = "agent"` parameter, allowing model chain overrides without duplicating agent logic.
+  - Updated `runAutoFixAndComment` to gracefully resolve the `DEMO_GITHUB_TOKEN` fallback when executing playground fixes on `codelenshq/playground`.
+  - Created `inngest/functions/demo-fix.ts` using `chainRole: "review"` (routing via fast, cost-efficient Flash models) and registered it in `app/api/inngest/route.ts`.
+  - Created `app/api/demo/fix/route.ts` API route with IP rate-limiting and validation against `DemoReview` records.
+  - Connected `app/demo/page.tsx` Auto-Fix button to hit the `/api/demo/fix` endpoint. `npx tsc --noEmit` clean (0 errors).
+
 

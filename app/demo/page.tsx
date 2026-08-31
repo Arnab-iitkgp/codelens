@@ -20,6 +20,43 @@ import "prismjs/themes/prism-tomorrow.css";
 const EDITABLE_FILES = ["api.ts", "auth.js", "db.js", "utils.js", "server.ts"];
 const DEMO_REPO_URL = "https://github.com/codelenshq/playground";
 
+const MOCK_REVIEW_DATA = {
+  summaryMarkdown: `## Architectural Overview
+This pull request implements the new user authentication endpoints.
+
+### Key Strengths
+* Good use of middleware for session validation.
+* Clean separation of concerns in the routing layer.
+
+### Flow Diagram
+\`\`\`mermaid
+sequenceDiagram
+    Client->>+API: POST /login
+    API->>+DB: Verify Credentials
+    DB-->>-API: Success
+    API-->>-Client: 200 OK + Cookie
+\`\`\`
+  `,
+  inlineFindings: [
+    {
+      id: "f-1",
+      path: "api.ts",
+      line: 21,
+      startLine: 18,
+      severity: "critical",
+      title: "CodeLens Agent (Auto-Fix)",
+      comment: "I analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.",
+      snippet: [
+        "  // If it's a review comment (has line/path context)",
+        "  if (comment.path && (comment.line || comment.original_line || comment.in_reply_to_id)) {",
+        "      console.log(`Triggering Auto-Fix for PR #${prNumber} on ${comment.path}`);",
+        "      const { Octokit } = await import(\"octokit\");"
+      ],
+      suggestion: "  if (action === \"created\" && comment?.body && comment.body.trim().toLowerCase().startsWith(\"/fix\")) {\n      const prNumber = body.issue ? body.issue.number : body.pull_request?.number;\n      const repo = body.repository.full_name;\n      const [owner, repoName] = repo.split(\"/\");\n\n      // If it's a review comment (has line/path context)\n      if (comment.path && (comment.line || comment.original_line || comment.in_reply_to_id)) {\n          console.log(`Triggering Auto-Fix for PR #${prNumber} on ${comment.path}`);\n          const { Octokit } = await import(\"octokit\");"
+    }
+  ]
+};
+
 type RepoFile = {
   path: string;
   originalContent: string;
@@ -55,6 +92,11 @@ export default function DemoPage() {
   const [isRepoCollapsed, setIsRepoCollapsed] = useState(false);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Auto-Fix mock states
+  const [fixingStatus, setFixingStatus] = useState<Record<string, 'idle' | 'running' | 'done'>>({});
+  const [agentLogs, setAgentLogs] = useState<Record<string, string[]>>({});
+  const [hasClickedFindings, setHasClickedFindings] = useState(false);
 
   // Fetch files from GitHub on mount
   useEffect(() => {
@@ -171,36 +213,27 @@ export default function DemoPage() {
     setOutputTab("review");
     setCurrentStep("Creating branch & PR on GitHub");
     setElapsedSeconds(0);
+    setHasClickedFindings(false);
 
     try {
       const res = await fetch("/api/demo/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          files: modified.map((f) => ({
-            path: f.path,
-            content: f.currentContent,
-          })),
-        }),
+        body: JSON.stringify({ files: modified }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setStatus("idle");
-        if (res.status === 429) {
-          toast.error(data.message || "Rate limit exceeded.");
-        } else {
-          toast.error(data.error || "Failed to start review.");
-        }
-        return;
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to start demo review");
       }
 
-      setDemoReviewId(data.id);
-    } catch (e) {
+      const data = await res.json();
+      setDemoReviewId(data.demoReviewId);
+      
+    } catch (e: any) {
       console.error(e);
       setStatus("idle");
-      toast.error("System error occurred.");
+      toast.error(e.message || "System error occurred.");
     }
   };
 
@@ -214,6 +247,7 @@ export default function DemoPage() {
     setCurrentStep("Waiting for PR execution...");
     setDemoPrUrl(null);
     setElapsedSeconds(0);
+    setHasClickedFindings(false);
   };
 
   const handleCopyReview = async () => {
@@ -226,6 +260,61 @@ export default function DemoPage() {
     } catch (err) {
       toast.error("Failed to copy review.");
     }
+  };
+
+  const handleAutoFixMock = async (findingId: string, path: string) => {
+    setFixingStatus((prev) => ({ ...prev, [findingId]: "running" }));
+    setAgentLogs((prev) => ({ ...prev, [findingId]: [] }));
+
+    const pushLog = (log: string, delay: number) => {
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          setAgentLogs((prev) => ({
+            ...prev,
+            [findingId]: [...(prev[findingId] || []), log],
+          }));
+          resolve();
+        }, delay);
+      });
+    };
+
+    await pushLog("[info] [Agent] Booting high-speed optimized agent...", 400);
+
+    if (demoReviewId) {
+      try {
+        await pushLog("[info] [Agent] Dispatching job to Inngest runner...", 500);
+        await pushLog(`[info] [Agent] Target file: ${path}`, 400);
+
+        const res = await fetch("/api/demo/fix", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ demoReviewId, findingId }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Auto-Fix request failed.");
+        }
+
+        await pushLog("[info] [Agent] Step 1: Tool read_file -> Inspecting code target...", 600);
+        await pushLog("[info] [Agent] Step 2: Tool write_plan -> Saving analysis...", 700);
+        await pushLog("[info] [Agent] Step 3: Tool propose_patch -> Generating patch...", 600);
+        await pushLog("[info] [Agent] Patch posted to GitHub Pull Request!", 400);
+
+        toast.success("Auto-Fix suggestion generated!");
+      } catch (err: any) {
+        console.error("Auto-Fix error:", err);
+        toast.error(err.message || "Failed to trigger Auto-Fix.");
+      }
+    } else {
+      await pushLog("[info] [Agent] Phase 1: Gathering graph context from Postgres...", 600);
+      await pushLog(`[info] [Agent] Tool: read_file -> ${path}`, 500);
+      await pushLog("[info] [Agent] Tool: write_plan recorded.", 800);
+      await pushLog("[info] [Agent] Tool: propose_patch -> Generating suggestion block...", 700);
+      await pushLog("[info] [Agent] Verified patch. Publishing to GitHub PR.", 400);
+    }
+
+    setFixingStatus((prev) => ({ ...prev, [findingId]: "done" }));
   };
 
   const closeFile = (path: string, e: React.MouseEvent) => {
@@ -268,6 +357,13 @@ export default function DemoPage() {
 
   return (
     <div className="h-screen bg-background flex flex-col font-sans overflow-hidden dark text-foreground">
+      {/* Persistent Playground Banner */}
+      <div className="bg-[#1e40af]/20 border-b border-[#1d4ed8]/30 px-4 py-2 flex items-center justify-center shrink-0">
+        <p className="text-[12px] text-blue-300 font-medium tracking-wide">
+          Welcome to Playground Mode. Experience our autonomous code review engine powered by optimized high-speed models to analyze pull requests and generate verified structural patches in real-time.
+        </p>
+      </div>
+
       {/* Top Application Bar */}
       <header className="h-[52px] border-b bg-background flex items-center justify-between px-4 flex-shrink-0 z-50">
         <div className="flex items-center gap-4 min-w-0">
@@ -647,38 +743,48 @@ export default function DemoPage() {
               </div>
 
               {status === "completed" && (
-                <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded border border-border/50 text-[11px]">
+                <div className="flex items-center gap-5 ml-4 h-[38px] text-[13px]">
                   <button
                     onClick={() => setOutputTab("review")}
-                    className={`px-2.5 py-0.5 rounded transition-colors font-medium ${
+                    className={`h-full relative flex items-center transition-colors ${
                       outputTab === "review"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground font-medium"
                     }`}
                   >
-                    Markdown Review
+                    Overview
                   </button>
                   <button
                     onClick={() => setOutputTab("trace")}
-                    className={`px-2.5 py-0.5 rounded transition-colors font-medium flex items-center gap-1 ${
+                    className={`h-full relative flex items-center gap-1.5 transition-colors ${
                       outputTab === "trace"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground font-medium"
                     }`}
                   >
-                    <Activity className="h-3 w-3 text-blue-400" />
+                    <Activity className={`h-3.5 w-3.5 ${outputTab === "trace" ? "text-blue-500" : ""}`} />
                     Agent Trace
                   </button>
                   <button
-                    onClick={() => setOutputTab("findings")}
-                    className={`px-2.5 py-0.5 rounded transition-colors font-medium flex items-center gap-1 ${
+                    onClick={() => { setOutputTab("findings"); setHasClickedFindings(true); }}
+                    className={`h-full relative flex items-center gap-1.5 transition-colors ${
                       outputTab === "findings"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground font-medium"
                     }`}
                   >
-                    <ShieldAlert className="h-3 w-3 text-amber-400" />
-                    Findings ({structuredData?.findings?.length || 0})
+                    <ShieldAlert className={`h-3.5 w-3.5 ${outputTab === "findings" ? "text-amber-500" : ""}`} />
+                    Issues List
+                    <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] leading-none ${outputTab === "findings" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-muted text-muted-foreground"}`}>
+                      {structuredData?.inlineFindings?.length || 0}
+                    </span>
+                    
+                    {/* Try Auto-Fix Tooltip on the Issues List Tab */}
+                    {!hasClickedFindings && status === "completed" && structuredData?.inlineFindings?.length > 0 && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded shadow-lg whitespace-nowrap animate-bounce flex items-center gap-1 z-[60] before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-[4px] before:border-transparent before:border-t-primary pointer-events-none">
+                        Try Auto-Fix
+                      </div>
+                    )}
                   </button>
                 </div>
               )}
@@ -912,9 +1018,9 @@ export default function DemoPage() {
                       </p>
                     </div>
 
-                    {structuredData?.findings && structuredData.findings.length > 0 ? (
+                    {structuredData?.inlineFindings && structuredData.inlineFindings.length > 0 ? (
                       <div className="space-y-3">
-                        {structuredData.findings.map((finding: any, i: number) => {
+                        {structuredData.inlineFindings.map((finding: any, i: number) => {
                           const severityColor = 
                             finding.severity === "critical"
                               ? "bg-red-500/10 text-red-500 border-red-500/30"
@@ -923,68 +1029,131 @@ export default function DemoPage() {
                               : "bg-blue-500/10 text-blue-500 border-blue-500/30";
 
                           return (
-                            <div key={i} className="border rounded-lg p-4 bg-card shadow-sm space-y-2.5">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${severityColor}`}>
-                                      {finding.severity}
-                                    </span>
-                                    <span className="text-xs font-mono text-muted-foreground">
-                                      {finding.file}:{finding.startLine}-{finding.endLine}
-                                    </span>
-                                    {finding.confidence && (
-                                      <span className="text-[10px] text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
-                                        Vote: {finding.confidence}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <h4 className="font-semibold text-sm text-foreground pt-1">
-                                    {finding.claim}
-                                  </h4>
+                            <div 
+                              key={i} 
+                              className="border rounded-md bg-[#0d1117] shadow-sm overflow-hidden text-[#c9d1d9] font-sans border-[#30363d] mb-4"
+                            >
+                              {/* GitHub Header: File Name */}
+                              <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs font-mono text-[#8b949e] flex items-center justify-between cursor-pointer hover:text-blue-400 transition-colors" onClick={() => openFile(finding.path)}>
+                                <div className="flex items-center gap-2">
+                                  <ChevronDown className="h-3 w-3" />
+                                  <span>{finding.path}</span>
                                 </div>
-
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 text-xs shrink-0 flex items-center gap-1.5 hover:border-primary hover:text-primary"
-                                  onClick={() => {
-                                    toast.success(`Fix applied for ${finding.file}!`, {
-                                      description: finding.suggestion
-                                    });
-                                  }}
-                                >
-                                  <Wand2 className="h-3.5 w-3.5 text-primary" />
-                                  Auto-Fix
-                                </Button>
+                                <span className="text-[10px]">Comment on lines {finding.startLine || finding.line} to {finding.line}</span>
                               </div>
-
-                              {finding.evidence && (
-                                <div className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded border font-mono">
-                                  <span className="font-sans font-semibold block text-[11px] text-foreground/70 mb-1">Evidence:</span>
-                                  {finding.evidence}
+                              
+                              {/* Code Snippet Area */}
+                              <div className="bg-[#0d1117] font-mono text-[12px] border-b border-[#30363d] overflow-x-auto">
+                                {finding.snippet ? (
+                                  <table className="w-full border-collapse">
+                                    <tbody>
+                                      {finding.snippet.map((lineText: string, idx: number) => {
+                                        const lnum = (finding.startLine || finding.line) + idx;
+                                        return (
+                                          <tr key={idx} className="hover:bg-[#161b22]">
+                                            <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
+                                            <td className="w-10 text-right pr-2 select-none text-[#6e7681] border-r border-[#30363d]">{lnum}</td>
+                                            <td className="pl-3 whitespace-pre text-[#c9d1d9]">{lineText}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div className="p-3 italic text-[#8b949e]">Context omitted</div>
+                                )}
+                              </div>
+                              
+                              {/* Comment Body */}
+                              <div className="p-3">
+                                {/* Comment Header */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-6 h-6 rounded-full overflow-hidden bg-[#27272a] border border-[#30363d] flex items-center justify-center p-0.5">
+                                    <img src="/codelens-logo.png" alt="CodeLens" className="w-full h-full object-contain" />
+                                  </div>
+                                  <span className="text-[13px] font-semibold text-[#c9d1d9]">CodeLens Agent</span>
+                                  <span className="text-[12px] text-[#8b949e]">just now</span>
+                                  <span className="ml-auto text-[10px] border border-[#30363d] px-1.5 py-0.5 rounded-full text-[#8b949e]">Author</span>
                                 </div>
-                              )}
-
-                              {finding.suggestion && (
-                                <div className="text-xs text-foreground/90 bg-primary/5 border border-primary/10 p-2.5 rounded">
-                                  <span className="font-semibold block text-[11px] text-primary mb-0.5">Suggested Fix:</span>
-                                  {finding.suggestion}
+                                
+                                {/* Markdown Body & Auto-Fix Button */}
+                                <div className="text-[13px] text-[#c9d1d9] mb-3 ml-8 leading-relaxed">
+                                  <div dangerouslySetInnerHTML={{ __html: finding.comment.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                  
+                                  {fixingStatus[finding.id] !== 'done' && (
+                                    <div className="mt-3 relative inline-block">
+                                      <Button 
+                                        size="sm" 
+                                        className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
+                                        onClick={() => handleAutoFixMock(finding.id, finding.path)}
+                                        disabled={fixingStatus[finding.id] === 'running'}
+                                      >
+                                        {fixingStatus[finding.id] === 'running' ? (
+                                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating patch...</>
+                                        ) : (
+                                          <><TerminalSquare className="h-3.5 w-3.5" /> Auto-Fix</>
+                                        )}
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-
-                              {finding.affects && finding.affects.length > 0 && (
-                                <div className="text-xs text-amber-500/90 bg-amber-500/5 border border-amber-500/15 p-2 rounded flex items-center gap-2">
-                                  <span className="font-semibold text-[11px]">💥 Impacted Callers (Blast Radius):</span>
-                                  <span className="font-mono text-[11px]">{finding.affects.join(", ")}</span>
-                                </div>
-                              )}
+                                
+                                {/* Agent Fake Terminal Logs */}
+                                {fixingStatus[finding.id] === 'running' && agentLogs[finding.id] && (
+                                  <div className="ml-8 mb-3 p-3 rounded-md bg-[#010409] border border-[#30363d] font-mono text-[11px] text-[#8b949e] space-y-1">
+                                    {agentLogs[finding.id].map((log, lidx) => (
+                                      <div key={lidx}>{log}</div>
+                                    ))}
+                                    <div className="animate-pulse">_</div>
+                                  </div>
+                                )}
+                                
+                                {/* Suggestion Block */}
+                                {finding.suggestion && fixingStatus[finding.id] === 'done' && (
+                                  <div className="ml-8 border border-[#30363d] rounded-md overflow-hidden bg-[#0d1117] mb-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="bg-[#161b22] px-3 py-2 border-b border-[#30363d] text-xs text-[#8b949e] flex justify-between items-center">
+                                      <span>Suggested change</span>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full font-mono text-[12px] border-collapse">
+                                        <tbody>
+                                          {/* Show old lines in red if snippet exists, else just show suggestion in green */}
+                                          {finding.snippet && finding.snippet.map((lineText: string, idx: number) => {
+                                            const lnum = (finding.startLine || finding.line) + idx;
+                                            return (
+                                              <tr key={`old-${idx}`} className="bg-[#ffebe9] dark:bg-[#ffebe9]/10">
+                                                <td className="w-10 text-right pr-2 select-none text-[#ff8182] border-r border-[#ff8182]/30">{lnum}</td>
+                                                <td className="w-8 text-center select-none text-[#ff8182] border-r border-[#ff8182]/30">-</td>
+                                                <td className="pl-3 whitespace-pre text-[#ff7b72]">{lineText}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                          {finding.suggestion.split('\n').map((lineText: string, idx: number) => {
+                                            const lnum = (finding.startLine || finding.line) + idx;
+                                            return (
+                                              <tr key={`new-${idx}`} className="bg-[#e6ffec] dark:bg-[#e6ffec]/10">
+                                                <td className="w-10 text-right pr-2 select-none text-[#3fb950] border-r border-[#3fb950]/30">{lnum}</td>
+                                                <td className="w-8 text-center select-none text-[#3fb950] border-r border-[#3fb950]/30">+</td>
+                                                <td className="pl-3 whitespace-pre text-[#7ee787]">{lineText}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                    <div className="bg-[#161b22] px-3 py-2 border-t border-[#30363d] flex justify-end gap-2">
+                                      <Button size="sm" variant="outline" className="h-7 text-[11px] px-3 bg-[#21262d] border-[#30363d] hover:bg-[#30363d] text-[#c9d1d9]" onClick={() => toast.success("Suggestion applied to codebase!")}>Apply suggestion</Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <div className="p-8 text-center border rounded-lg bg-muted/20 text-muted-foreground text-sm">
+                      <div className="p-8 text-center border rounded-lg bg-muted/20 text-muted-foreground text-sm flex flex-col items-center">
+                        <CheckCircle2 className="h-8 w-8 text-green-500 mb-3 opacity-80" />
                         🎉 Clean bill of health! No critical issues or bugs survived the verification pass.
                       </div>
                     )}

@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { Octokit } from "octokit";
 import { runAgenticFixer } from "./agent-fixer";
+import type { Role } from "./models";
 
 /**
  * Runs the Agentic Fixer for one finding and posts the result as a native
@@ -72,26 +73,43 @@ export async function runAutoFixAndComment(
   filePath: string,
   finding: string,
   startLine: number,
-  endLine: number
+  endLine: number,
+  chainRole: Role = "agent"
 ) {
   try {
-    console.log(`[AutoFix] Triggered for ${owner}/${repo} PR #${prNumber} on ${filePath} (L${startLine}-${endLine})`);
+    console.log(`[AutoFix] Triggered for ${owner}/${repo} PR #${prNumber} on ${filePath} (L${startLine}-${endLine}) using role "${chainRole}"`);
 
-    // 1. Get the repository and user token
-    const repository = await prisma.repository.findFirst({
-      where: { owner, name: repo },
-      include: {
-        user: {
-          include: { accounts: { where: { providerId: "github" } } }
+    // 1. Get the repository and user token (or fallback to DEMO token for playground)
+    let githubToken = "";
+    let repoId = `${owner}/${repo}`;
+
+    const demoOwner = process.env.DEMO_GITHUB_OWNER;
+    const demoRepo = process.env.DEMO_GITHUB_REPO;
+
+    if (demoOwner && demoRepo && owner === demoOwner && repo === demoRepo) {
+      githubToken = process.env.DEMO_GITHUB_TOKEN || "";
+    } else {
+      const repository = await prisma.repository.findFirst({
+        where: { owner, name: repo },
+        include: {
+          user: {
+            include: { accounts: { where: { providerId: "github" } } }
+          }
         }
-      }
-    });
+      });
 
-    if (!repository || !repository.user?.accounts?.[0]?.accessToken) {
-      throw new Error("Repository or GitHub token not found. Please ensure your GitHub account is linked.");
+      if (!repository || !repository.user?.accounts?.[0]?.accessToken) {
+        throw new Error("Repository or GitHub token not found. Please ensure your GitHub account is linked.");
+      }
+
+      githubToken = repository.user.accounts[0].accessToken;
+      repoId = repository.id;
     }
 
-    const githubToken = repository.user.accounts[0].accessToken;
+    if (!githubToken) {
+      throw new Error("No GitHub token available for Auto-Fix execution.");
+    }
+
     const octokit = new Octokit({ auth: githubToken });
 
     // 2. Run the Agent (Thinks, Plans, Acts)
@@ -99,11 +117,12 @@ export async function runAutoFixAndComment(
       githubToken,
       owner,
       repo,
-      repository.id,
+      repoId,
       finding,
       filePath,
       startLine,
-      endLine
+      endLine,
+      chainRole
     );
 
     if (!agentResult.success || !agentResult.patch) {
@@ -144,18 +163,33 @@ export async function runAutoFixAndComment(
 
     const commentBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.\n\n\`\`\`suggestion\n${finalPatch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
 
-    await octokit.rest.pulls.createReviewComment({
-      owner,
-      repo,
-      pull_number: prNumber,
-      body: commentBody,
-      commit_id: headCommitSha,
-      path: filePath,
-      line: finalEndLine,
-      start_line: finalStartLine !== finalEndLine ? finalStartLine : undefined
-    });
+    try {
+      await octokit.rest.pulls.createReviewComment({
+        owner,
+        repo,
+        pull_number: prNumber,
+        body: commentBody,
+        commit_id: headCommitSha,
+        path: filePath,
+        line: finalEndLine,
+        start_line: finalStartLine !== finalEndLine ? finalStartLine : undefined
+      });
+    } catch (reviewErr: any) {
+      if (reviewErr.status === 422) {
+        console.warn("[Auto-Fix] ⚠️ GitHub rejected inline comment (422) because the line is outside the PR diff. Falling back to general PR comment.");
+        const fallbackBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI generated a fix for \`${filePath}\` (L${finalStartLine}-L${finalEndLine}), but GitHub prevents inline suggestions on unmodified lines. Here is the suggested fix:\n\n\`\`\`${filePath}\n${finalPatch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
+        await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: prNumber,
+          body: fallbackBody,
+        });
+      } else {
+        throw reviewErr;
+      }
+    }
 
-    return { success: true };
+    return { success: true, agentResult, finalPatch, finalStartLine, finalEndLine };
   } catch (error) {
     console.error("[AutoFix] Error:", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
