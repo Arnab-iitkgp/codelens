@@ -104,7 +104,7 @@ export default async function Home() {
               )}
               <Link href="/demo">
                 <Button size="lg" className="bg-white dark:bg-[#18181b] text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-[#27272a] rounded-md border border-zinc-200 dark:border-zinc-800 px-8 h-12 text-base font-medium shadow-sm group">
-                  View Demo
+                  Try Demo
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -543,8 +543,7 @@ export default async function Home() {
             <div className="flex flex-col gap-3">
               <span className="text-[13px] font-semibold text-white dark:text-zinc-500 tracking-wide uppercase">Community</span>
               <a href="https://github.com/Arnab-iitkgp/codelens" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">GitHub</a>
-              <a href="https://discord.gg/codelens" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Discord</a>
-              <a href="https://twitter.com/codelens" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Twitter</a>
+              <a href="https://www.linkedin.com/in/arnab-dev/" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">LinkedIn</a>
             </div>
           </div>
           
