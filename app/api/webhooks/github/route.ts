@@ -27,8 +27,6 @@ export async function POST (req:NextRequest){
                 if (comment.path && (comment.line || comment.original_line || comment.in_reply_to_id)) {
                     console.log(`Triggering Auto-Fix for PR #${prNumber} on ${comment.path}`);
                     
-                    const { runAutoFixAndComment } = await import("@/module/ai/lib/auto-fix");
-                    const { getAccessToken } = await import("@/module/github/lib/github");
                     const { Octokit } = await import("octokit");
 
                     let findingText = comment.body.replace(/^\/fix/i, "").trim() || "User requested Auto-Fix via comment command.";
@@ -68,9 +66,20 @@ export async function POST (req:NextRequest){
                         }
                     }
 
-                    // Fire and forget so we don't block the webhook response
-                    runAutoFixAndComment(owner, repoName, prNumber, comment.path, findingText, targetStartLine, targetEndLine)
-                        .catch(err => console.error("Webhook Auto-Fix Failed:", err));
+                    // Fire and forget via Inngest to avoid Vercel serverless timeouts
+                    const { inngest } = await import("@/inngest/client");
+                    await inngest.send({
+                        name: "pr.auto_fix.requested",
+                        data: {
+                            owner,
+                            repo: repoName,
+                            prNumber,
+                            filePath: comment.path,
+                            findingText,
+                            targetStartLine,
+                            targetEndLine
+                        }
+                    });
                         
                 } else {
                     console.log("Mentioned on a general comment without file context.");
