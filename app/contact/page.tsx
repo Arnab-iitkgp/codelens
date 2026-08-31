@@ -7,7 +7,7 @@ import { useState } from "react";
 
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
-  const email = "arnab@codelens.dev"; // You can easily change this to your actual email
+  const email = "codelenshq@gmail.com"; // You can easily change this to your actual email
 
   const handleCopy = () => {
     navigator.clipboard.writeText(email);
@@ -51,7 +51,7 @@ export default function ContactPage() {
         </a>
         
         <div className="mt-8 pt-6 border-t border-zinc-100 text-[13px] text-zinc-400">
-          Or reach out via <a href="https://twitter.com/codelens" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-900 font-medium transition-colors">Twitter</a> or <a href="https://discord.gg/codelens" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-900 font-medium transition-colors">Discord</a>.
+          Or reach out via <a href="https://www.linkedin.com/in/arnab-dev/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-900 font-medium transition-colors">LinkedIn</a>.
         </div>
       </div>
     </div>
