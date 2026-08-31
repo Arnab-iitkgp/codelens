@@ -18,7 +18,7 @@ export async function POST (req:NextRequest){
             const action = body.action;
             const comment = body.comment;
             
-            if (action === "created" && comment.body.includes("@codelens fix")) {
+            if (action === "created" && comment.body.trim().startsWith("/fix")) {
                 const prNumber = body.issue ? body.issue.number : body.pull_request?.number;
                 const repo = body.repository.full_name;
                 const [owner, repoName] = repo.split("/");
@@ -31,7 +31,7 @@ export async function POST (req:NextRequest){
                     const { getAccessToken } = await import("@/module/github/lib/github");
                     const { Octokit } = await import("octokit");
 
-                    let findingText = comment.body.replace("@codelens fix", "").trim() || "User requested Auto-Fix via comment mention.";
+                    let findingText = comment.body.replace(/^\/fix/i, "").trim() || "User requested Auto-Fix via comment command.";
                     let targetEndLine = comment.original_line || comment.line || 1;
                     let targetStartLine = comment.original_start_line || comment.start_line || targetEndLine;
 
@@ -47,7 +47,11 @@ export async function POST (req:NextRequest){
                             });
 
                             if (parentComment?.body) {
+                                const userInstructions = comment.body.replace(/^\/fix/i, "").trim();
                                 findingText = `Original Bug Finding:\n${parentComment.body}`;
+                                if (userInstructions) {
+                                    findingText += `\n\nUser's Additional Instructions:\n${userInstructions}`;
+                                }
                                 targetEndLine = parentComment.original_line || parentComment.line || targetEndLine;
                                 targetStartLine = parentComment.original_start_line || parentComment.start_line || targetEndLine;
                                 console.log(`Resolved parent comment context for L${targetStartLine}-${targetEndLine}`);
