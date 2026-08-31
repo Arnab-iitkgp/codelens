@@ -38,7 +38,14 @@ export async function POST (req:NextRequest){
                     // If this is a reply to an existing CodeLens finding comment, fetch parent for exact context
                     if (comment.in_reply_to_id) {
                         try {
-                            const token = await getAccessToken();
+                            const { default: prisma } = await import("@/lib/db");
+                            const repository = await prisma.repository.findFirst({
+                                where: { owner, name: repoName },
+                                include: { user: { include: { accounts: { where: { providerId: "github" } } } } }
+                            });
+                            const token = repository?.user?.accounts?.[0]?.accessToken;
+                            if (!token) throw new Error("No linked GitHub account found for repo owner");
+                            
                             const octokit = new Octokit({ auth: token });
                             const { data: parentComment } = await octokit.rest.pulls.getReviewComment({
                                 owner,
