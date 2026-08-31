@@ -1,11 +1,35 @@
 ---
-title: The Review Pipeline
-description: "How CodeLens processes and reviews Pull Requests."
+title: "The Review Pipeline"
+description: "How CodeLens processes pull requests with deterministic AST context"
 ---
 
 Most AI tools suffer from hallucination because they lack context. If a PR changes a function signature in `utils/auth.ts`, the model won't know that `controllers/user.ts` just broke unless `controllers/user.ts` is *also* included in the PR diff.
 
 CodeLens solves this using a strict, multi-step pipeline built on **Inngest**, **Tree-sitter**, and **Vector RAG**.
+
+## Pipeline Architecture Flow
+
+<Steps>
+  <Step title="1. GitHub Webhook Gateway">
+    When a Pull Request is opened or updated, GitHub sends a webhook event. Our Next.js gateway validates the payload, enqueues an Inngest event, and returns an immediate `200 OK` to prevent gateway timeouts.
+  </Step>
+  <Step title="2. Inngest Job Queue (codelens-review-pr)">
+    Inngest picks up the event and executes the background review job asynchronously, ensuring zero timeouts even for large 50+ file PRs.
+  </Step>
+  <Step title="3. Context Retrieval (SQL Graph & Pinecone RAG)">
+    For every modified function in the PR diff:
+    * **PostgreSQL Code Graph**: Queries upstream and downstream symbol dependencies (call sites & class inheritance).
+    * **Pinecone Vector DB**: Queries high-dimensional AST symbol embeddings for semantic context.
+  </Step>
+  <Step title="4. Multi-Agent Triage (Zod Schema)">
+    The diff hunks + retrieved cross-file context are sent to the AI review chain (`gemini-3.5-flash`). The model is strictly constrained using `generateObject` with Zod schemas to output structured inline findings.
+  </Step>
+  <Step title="5. GitHub Inline Review Commenting">
+    Findings are translated into exact GitHub line numbers and posted as native inline review threads via Octokit API.
+  </Step>
+</Steps>
+
+---
 
 ## 1. The Indexing Phase (RAG)
 
@@ -20,25 +44,15 @@ Before CodeLens can review a PR, it must understand the codebase. When you conne
 
 When a PR is opened or updated on GitHub, a webhook payload is sent to our Next.js API. We immediately push an event to the Inngest queue and return a `200 OK` to GitHub to prevent timeouts.
 
-## 3. The Pipeline (Inngest Job)
+## 3. The Pipeline Execution
 
 The `codelens-review-pr` job orchestrates the heavy lifting:
 
-<Steps>
-  <Step title="Diff Extraction">
-    We fetch the PR patch from GitHub. We split the diff into "hunks" to identify exactly which lines were added or removed.
-  </Step>
-  <Step title="Context Retrieval (RAG)">
-    For every modified function in the diff, we query Pinecone and our SQL Graph. We pull in all *upstream* and *downstream* dependencies that might be affected by the change.
-  </Step>
-  <Step title="Multi-Agent Triage">
-    We pass the diff + the retrieved context to our base reviewer model (e.g., Gemini Flash). The model outputs a strict JSON schema identifying inline findings (bugs, security flaws, architectural drift).
-  </Step>
-  <Step title="GitHub Integration">
-    The findings are translated back into GitHub-compatible line numbers and posted as a native inline review thread!
-  </Step>
-</Steps>
+* **Step 1: Diff Extraction** — We fetch the PR patch from GitHub and split the diff into "hunks" to identify exactly which lines were added or removed.
+* **Step 2: Context Retrieval (RAG)** — For every modified function in the diff, we query Pinecone and our SQL Graph to pull in all *upstream* and *downstream* dependencies affected by the change.
+* **Step 3: Multi-Agent Triage** — We pass the diff + the retrieved context to our base reviewer model. The model outputs a strict JSON schema identifying inline findings.
+* **Step 4: GitHub Integration** — The findings are translated back into GitHub-compatible line numbers and posted as a native inline review thread!
 
-## Strict Schema Enforcement
-
+<Note>
 We never parse free-form text from the LLM. CodeLens strictly uses the `generateObject` API (via the Vercel AI SDK) coupled with Zod schemas. This ensures the output is always deterministic and safe to pipe directly to the GitHub API.
+</Note>

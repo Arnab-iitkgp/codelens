@@ -1,19 +1,44 @@
 ---
-title: The Auto-Fix Agent
-description: "How the ReAct agent generates working patches."
+title: "The Auto-Fix Agent"
+description: "Agentic ReAct loop for localized patch generation"
 ---
 
 When CodeLens posts an inline review finding on your PR, you can reply to the thread with the exact command `/fix`.
 
 This triggers a dedicated, high-intelligence agent (e.g., Gemini Pro or GPT-4o) whose sole purpose is to fix the issue *without* breaking the surrounding code.
 
+## Auto-Fix Execution Loop
+
+<Steps>
+  <Step title="1. Developer Triggers /fix Command">
+    A developer replies `/fix` on an inline GitHub review comment thread posted by CodeLens.
+  </Step>
+  <Step title="2. Webhook & Inngest auto-fix Job">
+    GitHub sends a comment webhook payload to Next.js API. The `auto-fix` job extracts the target branch, file patch, finding description, and thread ID (`in_reply_to_id`).
+  </Step>
+  <Step title="3. Tool Step 1: read_file">
+    The agent uses the `read_file` tool to inspect the exact surrounding lines of code in the target repository file.
+  </Step>
+  <Step title="4. Tool Step 2: write_plan">
+    The agent outputs a structured reasoning plan detailing how to fix the issue cleanly without introducing regressions.
+  </Step>
+  <Step title="5. Tool Step 3: propose_patch">
+    The agent invokes `propose_patch` with exact `targetContent` and `replacementContent` strings.
+  </Step>
+  <Step title="6. Threaded GitHub Commit Suggestion">
+    Octokit replies directly to the comment thread using `in_reply_to_id`, rendering a native **One-Click Commit Suggestion** in the GitHub UI!
+  </Step>
+</Steps>
+
+---
+
 ## The ReAct Loop
 
-Unlike the initial review pipeline which uses simple JSON schema generation, the Auto-Fix agent is a true **ReAct (Reason + Act)** loop. It is given a set of powerful backend tools that it can use iteratively.
+Unlike the initial review pipeline which uses simple JSON schema generation, the Auto-Fix agent is a true **ReAct (Reason + Act)** loop. It is given a set of powerful backend tools that it can use iteratively:
 
-1. **`read_file`**: The agent can inspect the exact surrounding lines of the file.
-2. **`write_plan`**: The agent must output a step-by-step reasoning plan before it writes any code.
-3. **`propose_patch`**: The agent generates a precise string replacement block.
+1. **`read_file`**: Inspects surrounding source code lines for exact context before proposing changes.
+2. **`write_plan`**: Outputs a step-by-step reasoning plan before writing any code modifications.
+3. **`propose_patch`**: Generates string-replacement chunks with target and replacement content.
 
 ### Why not just generate a file replacement?
 
@@ -29,4 +54,6 @@ This allows CodeLens to perform a highly safe, localized string replacement to g
 
 When the agent finalizes the patch, it doesn't just create a new top-level comment. CodeLens extracts the `in_reply_to_id` from the webhook and uses the `octokit.rest.pulls.createReplyForReviewComment` API.
 
-This ensures that the AI's suggested fix appears directly inside the original review thread on GitHub. You can simply click the **"Commit suggestion"** button in the GitHub UI, and the bug is resolved instantly.
+<Tip>
+This ensures that the AI's suggested fix appears directly inside the original review thread on GitHub. You can simply click the **"Commit suggestion"** button in the GitHub UI, and the bug is resolved instantly!
+</Tip>

@@ -1,23 +1,43 @@
 ---
-title: Model Chains & Split-Brain Architecture
-description: "How CodeLens handles provider quotas, fallbacks, and multi-model routing."
+title: "Model Chains & Split-Brain Architecture"
+description: "Resilient provider failover and role-based LLM routing"
 ---
 
-CodeLens is designed to never crash due to API rate-limits, model deprecations, or provider outages. 
+CodeLens is designed to never crash due to API rate-limits, model deprecations, or provider outages.
 
 To achieve maximum reliability and cost efficiency, CodeLens uses a **Split-Brain Architecture** paired with **Fallback Door Chains**.
 
+## Model Routing & Failover Flow
+
+<Steps>
+  <Step title="1. Split-Brain Task Classification">
+    Incoming requests are routed based on role requirements:
+    * **`AI_REVIEW_CHAIN`**: Fast diff triage (Gemini 3.5 Flash).
+    * **`AI_AGENT_CHAIN`**: Deep reasoning plan (Gemini 3.1 Pro).
+    * **`AI_EMBEDDING_CHAIN`**: High-dimensional vectorization (Pinecone).
+  </Step>
+  <Step title="2. Primary Provider Door Execution">
+    The chain attempts Door 1 (e.g. `google-vertex` or `google-api`).
+  </Step>
+  <Step title="3. Automatic Rate-Limit Failover (429 / Outage)">
+    If Door 1 hits a rate limit or network outage, CodeLens instantly catches the error and failover-routes to Door 2 (`groq` open weights) or Door 3 (`openai`).
+  </Step>
+  <Step title="4. Zero-Downtime Response Delivery">
+    Structured Zod object is returned from the first reachable provider in the fallback chain.
+  </Step>
+</Steps>
+
+---
+
 ## Split-Brain Model Routing
 
-Not every task in an AI code review engine requires the same level of model intelligence:
+Not every task in an AI code review engine requires the same level of model intelligence. By decoupling the review model from the agent model, CodeLens gives you near-instant PR reviews while reserving expensive reasoning power strictly for agentic code modification.
 
 | Role | Chain Variable | Default Target Model | Strategy |
 | :--- | :--- | :--- | :--- |
 | **Review Engine** | `AI_REVIEW_CHAIN` | `gemini-3.5-flash` | Ultra-fast, low latency, low cost for bulk diff scanning and AST triage. |
 | **Auto-Fix Agent** | `AI_AGENT_CHAIN` | `gemini-3.1-pro-preview` | High-reasoning, deep planning, multi-tool ReAct execution loop. |
 | **AST Embeddings** | `AI_EMBEDDING_CHAIN` | `gemini-embedding-001` | High-dimensional vector generation for Pinecone RAG storage. |
-
-By decoupling the review model from the agent model, CodeLens gives you near-instant PR reviews while reserving expensive reasoning power strictly for agentic code modification.
 
 ## Fallback Door Chains
 
@@ -27,10 +47,10 @@ Instead of hardcoding a single AI provider, CodeLens defines ordered fallback ch
 
 Chains are defined as comma-separated `"provider-door:model-id"` pairs in your `.env`:
 
-```ini .env
-AI_REVIEW_CHAIN="google-vertex:gemini-3.5-flash,google-api:gemini-3.5-flash,groq:openai/gpt-oss-120b"
-AI_AGENT_CHAIN="google-vertex:gemini-3.1-pro-preview,groq:openai/gpt-oss-120b"
-AI_EMBEDDING_CHAIN="google-vertex:gemini-embedding-001,google-api:gemini-embedding-001"
+```ini
+AI_REVIEW_CHAIN="google-api:gemini-3.5-flash,groq:openai/gpt-oss-120b"
+AI_AGENT_CHAIN="google-api:gemini-3.1-pro-preview,groq:openai/gpt-oss-120b"
+AI_EMBEDDING_CHAIN="google-api:gemini-embedding-001"
 ```
 
 ### Supported Doors
@@ -45,9 +65,11 @@ AI_EMBEDDING_CHAIN="google-vertex:gemini-embedding-001,google-api:gemini-embeddi
 
 For enterprise environments requiring strict SLA guarantees and private VPC connectivity, CodeLens natively supports Google Cloud Vertex AI via minified service account credentials:
 
-```ini .env
+```ini
 GCP_ENABLED=true
 GOOGLE_VERTEX_CREDENTIALS_JSON='{"type":"service_account","project_id":"..."}'
 ```
 
+<Info>
 If `GCP_ENABLED=true` is set, any chain specifying `google-vertex` will authenticate directly through Vertex AI endpoints instead of standard API keys.
+</Info>

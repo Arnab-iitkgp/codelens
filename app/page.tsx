@@ -34,7 +34,7 @@ export default async function Home() {
                 <Github className="h-4 w-4" />
                 Open Source
               </a>
-              <a href="https://github.com/Arnab-iitkgp/codelens/tree/main/docs" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
+              <a href="https://codelens.mintlify.app" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
                 Docs
               </a>
               <Link href="/contact" className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
@@ -249,7 +249,7 @@ export default async function Home() {
               It's about trusting your architecture.
             </p>
             <div className="mt-8">
-              <a href="https://github.com/Arnab-iitkgp/codelens/tree/main/docs" target="_blank" rel="noopener noreferrer">
+              <a href="https://codelens.mintlify.app" target="_blank" rel="noopener noreferrer">
                 <Button variant="secondary" className="bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 hover:bg-white dark:hover:bg-zinc-800 rounded-[8px] px-3.5 py-1.5 h-auto shadow-[0_0_15px_rgba(255,255,255,0.15)] dark:shadow-[0_4px_15px_rgba(0,0,0,0.05)] font-medium text-[13px] flex items-center transition-all">
                   <Github className="w-3.5 h-3.5 mr-1.5" />
                   View Documentation
@@ -536,8 +536,8 @@ export default async function Home() {
           <div className="flex gap-12 md:gap-16">
             <div className="flex flex-col gap-3">
               <span className="text-[13px] font-semibold text-white dark:text-zinc-500 tracking-wide uppercase">Product</span>
-              <a href="https://github.com/Arnab-iitkgp/codelens/tree/main/docs" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Documentation</a>
-              <a href="https://github.com/Arnab-iitkgp/codelens/blob/main/docs/architecture.md" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Architecture</a>
+              <a href="https://codelens.mintlify.app" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Documentation</a>
+              <a href="https://codelens.mintlify.app/architecture/pipeline" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Architecture</a>
               <a href="https://github.com/Arnab-iitkgp/codelens#self-hosting" target="_blank" rel="noopener noreferrer" className="text-[14px] text-zinc-400 dark:text-zinc-800 hover:text-white dark:hover:text-zinc-900 transition-colors">Self-Hosting</a>
             </div>
             <div className="flex flex-col gap-3">

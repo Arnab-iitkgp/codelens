@@ -1,0 +1,36 @@
+---
+title: "Introduction"
+description: "Open-source AI code review engine for GitHub"
+---
+
+CodeLens is an open-source, self-hostable AI code review engine that runs on your GitHub Pull Requests.
+
+Most AI coding tools are wrappers around a chat interface. CodeLens takes a different approach: we rely on a structured backend pipeline to do the heavy lifting before the LLM ever sees the code. 
+
+By parsing your codebase into an AST graph and using strict JSON schemas, CodeLens prevents hallucination and keeps API costs low while matching the quality of enterprise tools.
+
+<CardGroup cols={2}>
+  <Card title="Inline Code Review" icon="message" href="/architecture/pipeline">
+    CodeLens posts review comments directly on the specific lines of code in your GitHub PR, rather than dumping a generic summary.
+  </Card>
+  <Card title="Auto-Fix Patching" icon="screwdriver-wrench" href="/architecture/auto-fix">
+    Reply `/fix` to any review comment. A background agent will read the surrounding code and suggest a working patch you can commit with one click.
+  </Card>
+  <Card title="AST Graph Context" icon="code-branch" href="/architecture/pipeline">
+    CodeLens builds a dependency graph using `web-tree-sitter`. If a PR changes a function, it pulls in the downstream files that depend on it automatically.
+  </Card>
+  <Card title="Provider Agnostic" icon="server" href="/architecture/model-chains">
+    Run your review pipeline using Google Vertex AI, Groq, OpenAI, or any compatible provider. Fallback chains handle rate limits automatically.
+  </Card>
+</CardGroup>
+
+## How it works
+
+When a PR is opened, reviewing the diff alone isn't enough to catch architectural drift or breaking changes in downstream consumers. 
+
+CodeLens solves this by treating code as a graph:
+
+1. **Parse**: A background job parses your codebase using `web-tree-sitter`.
+2. **Index**: We extract functions, classes, and their dependencies, storing the relational graph in PostgreSQL and embeddings in Pinecone.
+3. **Retrieve**: When a PR is opened, CodeLens fetches the exact upstream and downstream context for the modified lines.
+4. **Review**: The diff and context are sent to the LLM, which outputs a strict JSON array of review comments that get pushed to GitHub.
