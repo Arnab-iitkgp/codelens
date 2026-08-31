@@ -1,0 +1,49 @@
+---
+title: Evaluation & Quality Harness
+description: "How we benchmark CodeLens review precision, recall, and efficiency."
+---
+
+The core rule of CodeLens development is simple: **no pipeline change ships without passing our evaluation gates.**
+
+Because prompt tweaks and context retrieval modifications can silently cause regressions, CodeLens includes a built-in automated **LLM-Judge Evaluation Harness**.
+
+## The Eval Cycle
+
+The eval harness tests the review pipeline against a benchmark suite of synthetic and real-world pull requests containing known security vulnerabilities, logic bugs, and architectural anti-patterns.
+
+```
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+│   `eval:run`    │ ────► │  `eval:judge`   │ ────► │  Eval History   │
+│ Execute Pipeline│       │ Score Precision │       │ Log Ledger      │
+└─────────────────┘       └─────────────────┘       └─────────────────┘
+```
+
+### 1. Execute Test Suite (`bun eval:run`)
+
+Runs all benchmark PR test cases located in `eval/cases/` through `runReview()`. The engine outputs structured findings without posting them to GitHub.
+
+```bash
+bun eval:run
+```
+
+### 2. LLM-as-a-Judge (`bun eval:judge`)
+
+An independent judge model evaluates the findings generated in step 1 against ground-truth labels for each test case.
+
+```bash
+bun eval:judge
+```
+
+The judge computes three primary metrics:
+
+* **Precision**: What percentage of flagged issues are legitimate bugs (measuring noise reduction)?
+* **Recall**: What percentage of ground-truth bugs in the codebase were successfully detected?
+* **Efficiency**: Token usage and total pipeline execution latency.
+
+## Metric Gates & Ledger
+
+Every pipeline update must be recorded in `docs/eval-history.md`. If a proposed prompt change or RAG optimization decreases Precision or Recall, the change is rejected.
+
+<Card title="Eval-Driven Architecture" icon="chart-line">
+By strictly gating code changes behind `eval:judge`, CodeLens ensures that lightweight or cheap models continue to deliver enterprise-grade accuracy without silent hallucinations.
+</Card>

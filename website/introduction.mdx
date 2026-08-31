@@ -1,0 +1,38 @@
+---
+title: Introduction
+description: "Welcome to CodeLens, the open-source AI Code Review Engine."
+---
+
+CodeLens is an open-source, self-hostable AI code review engine for GitHub Pull Requests. 
+
+While most AI coding tools act as simple wrappers around an LLM chat interface, CodeLens is designed around a core thesis: **the pipeline carries the load, not the model.**
+
+By forcing the Large Language Model to operate within strict, schema-constrained roles on curated, deterministic evidence (like an AST code graph), CodeLens matches the quality of enterprise AI tools using free or cheap models.
+
+<CardGroup cols={2}>
+  <Card title="Line-by-Line Review" icon="magnifying-glass-code">
+    Instead of dumping a massive summary at the bottom of your PR, CodeLens posts inline comments directly on the exact lines of code that contain issues, just like a human reviewer.
+  </Card>
+  <Card title="Agentic Auto-Fix" icon="wand-magic-sparkles">
+    When CodeLens finds an issue, it doesn't just complain. You can trigger the Auto-Fix agent directly from GitHub to generate a working patch that you can apply with one click.
+  </Card>
+  <Card title="Zero Blind Spots" icon="eye">
+    Using a Tree-sitter powered AST (Abstract Syntax Tree) graph, CodeLens understands the relationships between your files, ensuring it never hallucinates context.
+  </Card>
+  <Card title="Bring Your Own LLM" icon="microchip">
+    CodeLens is completely provider-agnostic. Route your review pipeline through Gemini, Groq, OpenAI, or Anthropic using simple environment variables.
+  </Card>
+</CardGroup>
+
+## Why CodeLens?
+
+Modern software moves fast, and peer reviews often become bottlenecks. Worse, subtle architectural drift or "blast radius" bugs (where changing a function in File A breaks a downstream consumer in File Z) are nearly impossible for a human to catch without hours of investigation.
+
+CodeLens solves this by combining **deterministic static analysis** with **probabilistic AI reasoning**. 
+
+1. We parse your codebase using `web-tree-sitter`.
+2. We map out every symbol, function, and edge (dependency).
+3. We embed these symbols using a high-speed embedding model.
+4. When a PR is opened, the agent fetches the *exact* cross-file context it needs before it ever writes a review.
+
+Welcome to the future of peer review. Let's get started.

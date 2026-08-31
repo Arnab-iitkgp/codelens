@@ -1,0 +1,44 @@
+---
+title: Using the Dashboard
+description: "How to navigate the CodeLens web interface, connect repositories, and view PR reviews."
+---
+
+Whether you are using our hosted platform or running CodeLens locally, the CodeLens web interface provides a centralized dashboard to manage your repositories, track review activity, and test PR reviews in real time.
+
+## 1. Authentication & Onboarding
+
+CodeLens uses GitHub OAuth for seamless, single-click authentication.
+
+1. Click **Sign In** in the top navigation bar.
+2. Authorize CodeLens to access your GitHub account.
+3. Once authenticated, you will be redirected to your **Dashboard**.
+
+## 2. Connecting a Repository
+
+To enable automated AI code reviews on a repository:
+
+1. Navigate to the **Repositories** tab in your dashboard.
+2. Click **Connect Repository**.
+3. Select any repository from your GitHub organization or personal account.
+4. CodeLens will automatically trigger an initial **AST Indexing** job in the background to build the symbol code graph for your codebase.
+
+<Note>
+You can track the indexing progress directly from the repository details page. Once indexed, all future Pull Requests on that repository will automatically receive line-by-line AI code reviews.
+</Note>
+
+## 3. Viewing PR Reviews & Traces
+
+Clicking on any repository opens its active and historic Pull Request reviews:
+
+* **Executive Summary**: High-level overview of the PR changes, risk assessment, and affected modules.
+* **Inline Findings**: Specific bugs, security vulnerabilities, or code smells mapped directly to file paths and line numbers.
+* **Agent Trace Visualizer**: Transparent insight into how the multi-agent system evaluated your code, including retrieval steps, AST queries, and model confidence scores.
+
+## 4. Using the Interactive Playground
+
+Want to test CodeLens before connecting your production repos?
+
+1. Visit the **Live Demo / Playground** (`/demo`).
+2. Paste any code snippet or select from pre-configured example pull requests.
+3. Click **Review PR** to watch CodeLens compile the diff, run static triage, and generate inline review comments in real time.
+4. Click **Auto-Fix** on any finding to see the ReAct agent generate a localized patch!

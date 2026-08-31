@@ -1,0 +1,53 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "CodeLens",
+  "colors": {
+    "primary": "#3B82F6",
+    "light": "#60A5FA",
+    "dark": "#2563EB"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "dashboard"
+        ]
+      },
+      {
+        "group": "Architecture & Internals",
+        "pages": [
+          "architecture/pipeline",
+          "architecture/auto-fix",
+          "architecture/model-chains"
+        ]
+      },
+      {
+        "group": "Quality & Benchmarking",
+        "pages": [
+          "evals"
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Arnab-iitkgp/codelens"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Arnab-iitkgp/codelens",
+      "x": "https://twitter.com/codelens"
+    }
+  }
+}

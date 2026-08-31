@@ -1,0 +1,32 @@
+---
+title: The Auto-Fix Agent
+description: "How the ReAct agent generates working patches."
+---
+
+When CodeLens posts an inline review finding on your PR, you can reply to the thread with the exact command `/fix`.
+
+This triggers a dedicated, high-intelligence agent (e.g., Gemini Pro or GPT-4o) whose sole purpose is to fix the issue *without* breaking the surrounding code.
+
+## The ReAct Loop
+
+Unlike the initial review pipeline which uses simple JSON schema generation, the Auto-Fix agent is a true **ReAct (Reason + Act)** loop. It is given a set of powerful backend tools that it can use iteratively.
+
+1. **`read_file`**: The agent can inspect the exact surrounding lines of the file.
+2. **`write_plan`**: The agent must output a step-by-step reasoning plan before it writes any code.
+3. **`propose_patch`**: The agent generates a precise string replacement block.
+
+### Why not just generate a file replacement?
+
+LLMs are notoriously bad at outputting massive, perfectly formatted files. If we asked the agent to rewrite a 500-line file, it might hallucinate whitespace, drop existing comments, or timeout.
+
+Instead, the `propose_patch` tool forces the agent to output:
+1. `targetContent`: The exact string it wants to replace (including whitespace).
+2. `replacementContent`: The new code.
+
+This allows CodeLens to perform a highly safe, localized string replacement to generate the patch.
+
+## Threaded Replies in GitHub
+
+When the agent finalizes the patch, it doesn't just create a new top-level comment. CodeLens extracts the `in_reply_to_id` from the webhook and uses the `octokit.rest.pulls.createReplyForReviewComment` API.
+
+This ensures that the AI's suggested fix appears directly inside the original review thread on GitHub. You can simply click the **"Commit suggestion"** button in the GitHub UI, and the bug is resolved instantly.

@@ -1,0 +1,45 @@
+{
+  "name": "CodeLens",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#3B82F6",
+    "light": "#60A5FA",
+    "dark": "#2563EB"
+  },
+  "topbarCtaButton": {
+    "type": "github",
+    "url": "https://github.com/Arnab-iitkgp/codelens"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "dashboard"
+      ]
+    },
+    {
+      "group": "Architecture & Internals",
+      "pages": [
+        "architecture/pipeline",
+        "architecture/auto-fix",
+        "architecture/model-chains"
+      ]
+    },
+    {
+      "group": "Quality & Benchmarking",
+      "pages": [
+        "evals"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/Arnab-iitkgp/codelens",
+    "x": "https://twitter.com/codelens"
+  }
+}

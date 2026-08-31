@@ -1,0 +1,44 @@
+---
+title: The Review Pipeline
+description: "How CodeLens processes and reviews Pull Requests."
+---
+
+Most AI tools suffer from hallucination because they lack context. If a PR changes a function signature in `utils/auth.ts`, the model won't know that `controllers/user.ts` just broke unless `controllers/user.ts` is *also* included in the PR diff.
+
+CodeLens solves this using a strict, multi-step pipeline built on **Inngest**, **Tree-sitter**, and **Vector RAG**.
+
+## 1. The Indexing Phase (RAG)
+
+Before CodeLens can review a PR, it must understand the codebase. When you connect a repository, a background job is triggered:
+
+1. **Fetch & Parse**: The codebase is pulled, and `web-tree-sitter` parses the code into an Abstract Syntax Tree (AST).
+2. **Symbol Extraction**: Functions, classes, and variable exports are extracted as unique "Symbols".
+3. **Graph Building**: The AST determines which symbols depend on each other, creating "Edges" in our graph.
+4. **Vector Embeddings**: Each symbol is embedded using a model (e.g., `text-embedding-004`) and stored in Pinecone, while the relational graph is stored in PostgreSQL.
+
+## 2. The Webhook Trigger
+
+When a PR is opened or updated on GitHub, a webhook payload is sent to our Next.js API. We immediately push an event to the Inngest queue and return a `200 OK` to GitHub to prevent timeouts.
+
+## 3. The Pipeline (Inngest Job)
+
+The `codelens-review-pr` job orchestrates the heavy lifting:
+
+<Steps>
+  <Step title="Diff Extraction">
+    We fetch the PR patch from GitHub. We split the diff into "hunks" to identify exactly which lines were added or removed.
+  </Step>
+  <Step title="Context Retrieval (RAG)">
+    For every modified function in the diff, we query Pinecone and our SQL Graph. We pull in all *upstream* and *downstream* dependencies that might be affected by the change.
+  </Step>
+  <Step title="Multi-Agent Triage">
+    We pass the diff + the retrieved context to our base reviewer model (e.g., Gemini Flash). The model outputs a strict JSON schema identifying inline findings (bugs, security flaws, architectural drift).
+  </Step>
+  <Step title="GitHub Integration">
+    The findings are translated back into GitHub-compatible line numbers and posted as a native inline review thread!
+  </Step>
+</Steps>
+
+## Strict Schema Enforcement
+
+We never parse free-form text from the LLM. CodeLens strictly uses the `generateObject` API (via the Vercel AI SDK) coupled with Zod schemas. This ensures the output is always deterministic and safe to pipe directly to the GitHub API.
