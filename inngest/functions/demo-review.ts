@@ -1,8 +1,7 @@
 import { inngest } from "../client";
 import prisma from "@/lib/db";
-import { getLanguageModel, generateTextWithFallback } from "@/module/ai/lib/models";
 import { Octokit } from "octokit";
-import { retrieveContext } from "@/module/ai/lib/rag";
+import { runReview } from "@/module/review/lib/engine";
 
 const DEMO_BRANCH_PREFIX = "demo-review-";
 
@@ -130,7 +129,7 @@ export const generateDemoReview = inngest.createFunction(
           prNumber,
           prUrl,
           status: "reviewing",
-          currentStep: "Fetching codebase context via RAG",
+          currentStep: "Analyzing changes with Multi-Agent Engine",
         },
       });
     });
@@ -147,49 +146,23 @@ export const generateDemoReview = inngest.createFunction(
       return data as unknown as string;
     });
 
-    // Step 3: Retrieve RAG context from indexed codebase
-    const context = await step.run("retrieve-demo-context", async () => {
-      const repoId = `${owner}/${repo}`;
-      const query = `[Demo] Code changes across ${files.length} file(s)\n${files.map(f => f.path).join(", ")}`;
-      const results = await retrieveContext(query, repoId);
-      
+    // Step 3: Run the CodeLens multi-agent review engine (AGENTS.md Rule #2)
+    const reviewResult = await step.run("run-demo-review-engine", async () => {
       await prisma.demoReview.update({
         where: { id: demoReviewId },
         data: {
-          currentStep: "Analyzing code changes with Gemini AI",
+          currentStep: "Analyzing changes with Multi-Agent Engine",
         },
       });
-      
-      return results;
-    });
 
-    // Step 4: Generate AI review with codebase context
-    const review = await step.run("generate-demo-ai-review", async () => {
-      const prompt = `You are an expert code reviewer. Analyze the following pull request and provide a detailed, constructive code review.
-
-PR Title: [Demo] Code changes across ${files.length} file(s)
-PR Description: This code was submitted by a user trying out CodeLens.
-
-Context from Codebase:
-${context.join("\n\n")}
-
-Code Changes (unified diff):
-\`\`\`diff
-${diff}
-\`\`\`
-
-Please provide:
-1. **Walkthrough**: A file-by-file explanation of the changes. Keep it short, concise and to the point.
-2. **Sequence Diagram**: A Mermaid JS sequence diagram visualizing the flow of the changes (if applicable). Use \`\`\`mermaid ... \`\`\` block. **IMPORTANT**: Ensure the Mermaid syntax is strictly valid. Do not use quotes around participant names. For notes, you MUST use 'Note over [Participant]:' or 'Note right of [Participant]:'. Never use 'note [Participant]' without a position. Keep it simple.
-3. **Summary**: Brief overview.
-4. **Strengths**: What's done well.
-5. **Issues**: Bugs, security concerns, code smells.
-6. **Suggestions**: Specific code improvements.
-
-Format your response in markdown.`;
-
-      const { text } = await generateTextWithFallback(prompt);
-      return text;
+      const repoId = `${owner}/${repo}`;
+      return await runReview({
+        diff,
+        title: `[Demo] Code changes across ${files.length} file(s)`,
+        description: "This code was submitted by a user trying out CodeLens.",
+        repoId,
+        reviewMode: "standard",
+      });
     });
 
     // Step 4: Post review as PR comment
@@ -208,16 +181,18 @@ Format your response in markdown.`;
         owner,
         repo,
         issue_number: prNumber,
-        body: `## Automated Code Review\n\n${review}\n\n*This review was generated automatically by CodeLens Demo.*`,
+        body: `## Automated Code Review\n\n${reviewResult.output}\n\n*This review was generated automatically by CodeLens Demo.*`,
       });
     });
 
-    // Step 5: Store the review
+    // Step 5: Store the review output, trace data, and structured findings
     await step.run("store-demo-review", async () => {
       await prisma.demoReview.update({
         where: { id: demoReviewId },
         data: {
-          review,
+          review: reviewResult.output,
+          traceData: JSON.parse(JSON.stringify(reviewResult.trace)),
+          structured: JSON.parse(JSON.stringify(reviewResult.structured)),
           status: "completed",
           currentStep: "Done",
         },

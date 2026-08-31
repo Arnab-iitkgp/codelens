@@ -23,6 +23,8 @@ export async function GET(
       id: demoReview.id,
       status: demoReview.status,
       review: demoReview.review,
+      traceData: demoReview.traceData,
+      structured: demoReview.structured,
       prUrl: demoReview.prUrl,
       currentStep: demoReview.currentStep,
       createdAt: demoReview.createdAt,
