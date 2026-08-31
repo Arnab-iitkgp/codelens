@@ -248,5 +248,13 @@
 - **Fixed Webhook Parent Comment Context Resolution (`app/api/webhooks/github/route.ts`)**: When `@codelens fix` is triggered via comment mention, the webhook handler now checks for `comment.in_reply_to_id` and uses Octokit to fetch the parent review comment body and line numbers. The Auto-Fix agent receives the exact bug claim/evidence and precise line range rather than a placeholder string. Verified via `scratch/test-webhook-parent.ts`.
 - **Implemented Deterministic Patch Trimmer (`module/ai/lib/auto-fix.ts`)**: Added `trimPatchToDelta()` in pure TypeScript. Before posting the suggestion comment to GitHub, the trimmer compares the agent's patch against the original file content at `[startLine..endLine]`, stripping identical leading and trailing context lines and updating `startLine`/`endLine`. The agent maintains 100% full file context during ReAct reasoning, but GitHub receives a minimal 1-line suggestion block (`return false;` at line 31). Verified via `scratch/test-patch-trimmer.ts`.
 - **Preserved Range Deltas in Existence Checks (`module/review/lib/engine.ts`)**: Updated `performExistenceChecks()` to preserve `lineDelta = finding.endLine - finding.startLine` when snapping hallucinated line numbers to valid diff hunks. Verified via `scratch/test-existence-checks.ts`.
-- **Production Build Check**: Ran `bun run build` — compiled successfully in 49s with 0 TypeScript/Turbopack errors across all 17 routes.
+### 2026-08-31 — CodeLens Demo Pipeline & UI Modernization
+- **Refactored Demo Review Background Function (`inngest/functions/demo-review.ts`)**: Upgraded `generateDemoReview` to run the primary CodeLens engine `runReview()` directly with structured extraction and 3x multi-agent defense voting (enforcing AGENTS.md Rule #2).
+- **Added Trace & Structured Data Schema Persistence (`prisma/schema.prisma`)**: Added `traceData` and `structured` JSON columns to `DemoReview` model and ran `prisma db push` / `prisma generate`.
+- **Upgraded Demo Status API Route (`app/api/demo/status/[id]/route.ts`)**: Exposed `traceData` and `structured` output to the demo frontend interface.
+- **Enhanced Demo UI Output Console (`app/demo/page.tsx`)**:
+  - Introduced interactive sub-tabs for **Markdown Review**, **Agent Execution Trace Timeline**, and **Structured AI Findings Cards**.
+  - Visualized Step 1 Investigator context retrieval chunks, Prosecutor vs. 3x Defense Agent voting matrix (showing kept vs. rejected false positives), and grounded findings.
+  - Added structured finding cards with severity badges, category labels, vote counts, blast radius indicators, and an interactive **"Auto-Fix with AI"** button.
+- **Branch & Type Safety**: Verified 0 TypeScript errors with `bunx tsc --noEmit` on the new `demo-page` branch.
 

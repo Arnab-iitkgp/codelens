@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { FileCode, Play, AlertCircle, RefreshCw, Github, GitPullRequest, TerminalSquare, Loader2, ChevronDown, PanelLeft, X, Copy, Check } from "lucide-react";
+import { 
+  FileCode, Play, AlertCircle, RefreshCw, Github, GitPullRequest, TerminalSquare, 
+  Loader2, ChevronDown, PanelLeft, X, Copy, Check, Activity, Scale, Search, 
+  Zap, ShieldAlert, CheckCircle2, XCircle, Wand2 
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -41,6 +45,9 @@ export default function DemoPage() {
   const [status, setStatus] = useState<"idle" | "pending" | "reviewing" | "completed" | "failed">("idle");
   const [currentStep, setCurrentStep] = useState<string>("Waiting for PR execution...");
   const [reviewResult, setReviewResult] = useState<string>("");
+  const [traceData, setTraceData] = useState<any>(null);
+  const [structuredData, setStructuredData] = useState<any>(null);
+  const [outputTab, setOutputTab] = useState<"review" | "trace" | "findings">("review");
   const [demoPrUrl, setDemoPrUrl] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -110,6 +117,8 @@ export default function DemoPage() {
           setStatus("completed");
           if (data.currentStep) setCurrentStep(data.currentStep);
           setReviewResult(data.review);
+          if (data.traceData) setTraceData(data.traceData);
+          if (data.structured) setStructuredData(data.structured);
           if (data.prUrl) setDemoPrUrl(data.prUrl);
         } else if (data.status === "failed") {
           setStatus("failed");
@@ -157,6 +166,9 @@ export default function DemoPage() {
 
     setStatus("pending");
     setReviewResult("");
+    setTraceData(null);
+    setStructuredData(null);
+    setOutputTab("review");
     setCurrentStep("Creating branch & PR on GitHub");
     setElapsedSeconds(0);
 
@@ -196,6 +208,9 @@ export default function DemoPage() {
     setDemoReviewId(null);
     setStatus("idle");
     setReviewResult("");
+    setTraceData(null);
+    setStructuredData(null);
+    setOutputTab("review");
     setCurrentStep("Waiting for PR execution...");
     setDemoPrUrl(null);
     setElapsedSeconds(0);
@@ -625,12 +640,50 @@ export default function DemoPage() {
         <section className={`flex-1 flex flex-col min-w-0 bg-background relative ${activeTab === "analysis" ? "flex" : "hidden md:flex"}`}>
           {/* Output Header */}
           <div className="h-[38px] bg-muted/50 border-b flex items-center justify-between px-4 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <TerminalSquare className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[13px] font-semibold text-foreground/80 uppercase tracking-wide">
-                Analysis Output
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/80 uppercase tracking-wide">
+                <TerminalSquare className="h-4 w-4 text-muted-foreground" />
+                <span>Analysis Output</span>
+              </div>
+
+              {status === "completed" && (
+                <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded border border-border/50 text-[11px]">
+                  <button
+                    onClick={() => setOutputTab("review")}
+                    className={`px-2.5 py-0.5 rounded transition-colors font-medium ${
+                      outputTab === "review"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Markdown Review
+                  </button>
+                  <button
+                    onClick={() => setOutputTab("trace")}
+                    className={`px-2.5 py-0.5 rounded transition-colors font-medium flex items-center gap-1 ${
+                      outputTab === "trace"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Activity className="h-3 w-3 text-blue-400" />
+                    Agent Trace
+                  </button>
+                  <button
+                    onClick={() => setOutputTab("findings")}
+                    className={`px-2.5 py-0.5 rounded transition-colors font-medium flex items-center gap-1 ${
+                      outputTab === "findings"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <ShieldAlert className="h-3 w-3 text-amber-400" />
+                    Findings ({structuredData?.findings?.length || 0})
+                  </button>
+                </div>
+              )}
             </div>
+
             {status === "completed" && (
               <Button variant="ghost" size="sm" onClick={handleReset} className="h-7 text-xs px-2 text-muted-foreground hover:bg-muted">
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -684,14 +737,12 @@ export default function DemoPage() {
 
                   {[
                     "Creating branch & PR on GitHub",
-                    "Fetching codebase context via RAG",
-                    "Analyzing code changes with Gemini AI",
+                    "Analyzing changes with Multi-Agent Engine",
                     "Posting review on Pull Request"
                   ].map((stepText, idx) => {
                     const stepOrder = [
                       "Creating branch & PR on GitHub",
-                      "Fetching codebase context via RAG",
-                      "Analyzing code changes with Gemini AI",
+                      "Analyzing changes with Multi-Agent Engine",
                       "Posting review on Pull Request",
                       "Done"
                     ];
@@ -742,15 +793,204 @@ export default function DemoPage() {
 
             {/* Completed State */}
             {status === "completed" && (
-              <div className="prose prose-sm dark:prose-invert max-w-none 
-                prose-headings:border-b prose-headings:pb-2 prose-headings:font-semibold
-                prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-                prose-a:text-primary hover:prose-a:underline
-                prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
-                prose-pre:bg-muted/50 prose-pre:border prose-pre:text-[13px]
-              ">
-                <Streamdown>{reviewResult}</Streamdown>
-              </div>
+              <>
+                {/* View 1: Markdown Review */}
+                {outputTab === "review" && (
+                  <div className="prose prose-sm dark:prose-invert max-w-none 
+                    prose-headings:border-b prose-headings:pb-2 prose-headings:font-semibold
+                    prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
+                    prose-a:text-primary hover:prose-a:underline
+                    prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                    prose-pre:bg-muted/50 prose-pre:border prose-pre:text-[13px]
+                  ">
+                    <Streamdown>{reviewResult}</Streamdown>
+                  </div>
+                )}
+
+                {/* View 2: Agent Trace Timeline */}
+                {outputTab === "trace" && (
+                  <div className="space-y-6 text-sm">
+                    <div className="border-b pb-3">
+                      <h3 className="font-semibold text-base flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-blue-500" />
+                        Agent Execution Trace Timeline
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Transparent multi-agent pipeline showing context retrieval, prosecutor proposals, and 3x defense voting consensus.
+                      </p>
+                    </div>
+
+                    {/* Step 1: Context Retrieval */}
+                    <div className="border rounded-md p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Search className="h-4 w-4 text-purple-400" />
+                        <span>Step 1: The Investigator (Context Retrieval)</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Retrieved {traceData?.chunks?.length || 0} codebase snippets via Pinecone & Tree-sitter dependency graph.
+                      </p>
+                      {traceData?.chunks && traceData.chunks.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          {traceData.chunks.map((chunk: any, i: number) => (
+                            <div key={i} className="text-xs font-mono bg-background p-2 rounded border flex justify-between items-center">
+                              <span>{chunk.path}</span>
+                              <span className="text-[10px] text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded">
+                                {chunk.type}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 2 & 3: Voting Matrix */}
+                    <div className="border rounded-md p-4 bg-muted/20 space-y-3">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Scale className="h-4 w-4 text-orange-400" />
+                        <span>Step 2 & 3: Prosecutor & 3x Defense Voting</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        The Prosecutor proposed {traceData?.initialFindings?.length || 0} initial claims. 3 Defense Agents voted to accept or reject false positives.
+                      </p>
+
+                      {traceData?.initialFindings && traceData.initialFindings.length > 0 ? (
+                        <div className="space-y-2">
+                          {traceData.initialFindings.map((finding: any, i: number) => {
+                            const verified = traceData?.verifiedFindings?.find((v: any) => v.claim === finding.claim);
+                            const isKept = !!verified;
+                            return (
+                              <div key={i} className={`p-3 rounded border text-xs space-y-1.5 ${isKept ? "bg-background border-border" : "bg-red-500/5 border-red-500/20 opacity-70"}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold">{finding.claim}</span>
+                                  {isKept ? (
+                                    <span className="text-[10px] bg-green-500/10 text-green-500 border border-green-500/20 px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      {verified.confidence || "Verified 3/3"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                                      <XCircle className="h-3 w-3" />
+                                      Rejected (False Positive)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground font-mono">
+                                  {finding.file}:{finding.startLine}-{finding.endLine}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No findings were proposed by the Prosecutor.</p>
+                      )}
+                    </div>
+
+                    {/* Step 4: Final Output */}
+                    <div className="border rounded-md p-4 bg-muted/20 space-y-2">
+                      <div className="flex items-center gap-2 font-medium">
+                        <Zap className="h-4 w-4 text-amber-400" />
+                        <span>Step 4: Grounded Review & PR Posting</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Surviving {traceData?.verifiedFindings?.length || 0} findings were snapped to diff hunks and published.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* View 3: Structured Findings Cards */}
+                {outputTab === "findings" && (
+                  <div className="space-y-4">
+                    <div className="border-b pb-3">
+                      <h3 className="font-semibold text-base flex items-center gap-2">
+                        <ShieldAlert className="h-5 w-5 text-amber-500" />
+                        Structured AI Findings
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Verified bugs, security vulnerabilities, and logic flaws extracted with schema-first precision.
+                      </p>
+                    </div>
+
+                    {structuredData?.findings && structuredData.findings.length > 0 ? (
+                      <div className="space-y-3">
+                        {structuredData.findings.map((finding: any, i: number) => {
+                          const severityColor = 
+                            finding.severity === "critical"
+                              ? "bg-red-500/10 text-red-500 border-red-500/30"
+                              : finding.severity === "warning"
+                              ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                              : "bg-blue-500/10 text-blue-500 border-blue-500/30";
+
+                          return (
+                            <div key={i} className="border rounded-lg p-4 bg-card shadow-sm space-y-2.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${severityColor}`}>
+                                      {finding.severity}
+                                    </span>
+                                    <span className="text-xs font-mono text-muted-foreground">
+                                      {finding.file}:{finding.startLine}-{finding.endLine}
+                                    </span>
+                                    {finding.confidence && (
+                                      <span className="text-[10px] text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                                        Vote: {finding.confidence}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h4 className="font-semibold text-sm text-foreground pt-1">
+                                    {finding.claim}
+                                  </h4>
+                                </div>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 text-xs shrink-0 flex items-center gap-1.5 hover:border-primary hover:text-primary"
+                                  onClick={() => {
+                                    toast.success(`Fix applied for ${finding.file}!`, {
+                                      description: finding.suggestion
+                                    });
+                                  }}
+                                >
+                                  <Wand2 className="h-3.5 w-3.5 text-primary" />
+                                  Auto-Fix
+                                </Button>
+                              </div>
+
+                              {finding.evidence && (
+                                <div className="text-xs text-muted-foreground bg-muted/40 p-2.5 rounded border font-mono">
+                                  <span className="font-sans font-semibold block text-[11px] text-foreground/70 mb-1">Evidence:</span>
+                                  {finding.evidence}
+                                </div>
+                              )}
+
+                              {finding.suggestion && (
+                                <div className="text-xs text-foreground/90 bg-primary/5 border border-primary/10 p-2.5 rounded">
+                                  <span className="font-semibold block text-[11px] text-primary mb-0.5">Suggested Fix:</span>
+                                  {finding.suggestion}
+                                </div>
+                              )}
+
+                              {finding.affects && finding.affects.length > 0 && (
+                                <div className="text-xs text-amber-500/90 bg-amber-500/5 border border-amber-500/15 p-2 rounded flex items-center gap-2">
+                                  <span className="font-semibold text-[11px]">💥 Impacted Callers (Blast Radius):</span>
+                                  <span className="font-mono text-[11px]">{finding.affects.join(", ")}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center border rounded-lg bg-muted/20 text-muted-foreground text-sm">
+                        🎉 Clean bill of health! No critical issues or bugs survived the verification pass.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

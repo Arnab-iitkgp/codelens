@@ -77,6 +77,8 @@ model DemoReview {
   prNumber    Int?
   prUrl       String?
   review      String?
+  traceData   Json?    @default("{}")
+  structured  Json?    @default("{}")
   status      String   @default("pending")
   ipAddress   String
   createdAt   DateTime @default(now())
