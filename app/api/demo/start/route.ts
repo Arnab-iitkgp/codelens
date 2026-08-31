@@ -72,11 +72,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (recentAttempts >= 2) {
+    if (recentAttempts >= 5) {
       return NextResponse.json(
         {
           error: "Rate limit exceeded",
-          message: "You can try the demo twice every 24 hours.",
+          message: "You can try the demo 5 times every 24 hours.",
         },
         { status: 429 }
       );

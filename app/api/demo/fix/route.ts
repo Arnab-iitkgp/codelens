@@ -38,27 +38,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Client IP rate limiting
-    const forwarded = req.headers.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-
-    const cutoff = new Date(Date.now() - RATE_LIMIT_HOURS * 60 * 60 * 1000);
-    const recentAttempts = await prisma.demoAttempt.count({
-      where: {
-        ipAddress: ip,
-        createdAt: { gte: cutoff },
-      },
-    });
-
-    if (recentAttempts >= 2) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded",
-          message: "You can try demo features twice every 24 hours.",
-        },
-        { status: 429 }
-      );
-    }
+    // Rate limiting is intentionally bypassed for Auto-Fixes.
+    // As long as the user successfully generated a DemoReview, 
+    // they can apply fixes to it.
 
     // Fetch DemoReview from database
     const demoReview = await prisma.demoReview.findUnique({

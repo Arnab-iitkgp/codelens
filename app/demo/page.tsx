@@ -385,7 +385,7 @@ export default function DemoPage() {
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border/50 bg-muted/30 px-2 py-1.5 rounded pr-3 shrink-0">
             <AlertCircle className="h-3.5 w-3.5 text-primary/70" />
-            <span><strong className="text-foreground/80">2 demos</strong> limit per day</span>
+            <span><strong className="text-foreground/80">5 demos</strong> limit per day</span>
           </div>
           <Link href="/login" className="shrink-0">
             <Button size="sm" variant="default" className="h-8">
