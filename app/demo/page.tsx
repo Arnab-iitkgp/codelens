@@ -219,7 +219,12 @@ export default function DemoPage() {
       const res = await fetch("/api/demo/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files: modified }),
+        body: JSON.stringify({
+          files: modified.map((f) => ({
+            path: f.path,
+            content: f.currentContent,
+          })),
+        }),
       });
 
       if (!res.ok) {

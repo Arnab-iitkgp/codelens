@@ -5,19 +5,30 @@ import { inngest } from "@/inngest/client";
 const RATE_LIMIT_HOURS = 24;
 const ALLOWED_FILES = ["api.ts", "auth.js", "db.js", "utils.js", "server.ts"];
 
+interface IncomingFile {
+  path: string;
+  content?: string;
+  currentContent?: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Support new multi-file format
-    const files: Array<{ path: string; content: string }> = body.files;
+    // Support multi-file format
+    const rawFiles: IncomingFile[] = body.files;
 
-    if (!files || !Array.isArray(files) || files.length === 0) {
+    if (!rawFiles || !Array.isArray(rawFiles) || rawFiles.length === 0) {
       return NextResponse.json(
         { error: "At least one modified file is required." },
         { status: 400 }
       );
     }
+
+    const files = rawFiles.map((f) => ({
+      path: f.path,
+      content: f.content ?? f.currentContent ?? "",
+    }));
 
     // Validate each file
     for (const file of files) {
@@ -34,9 +45,9 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      if (!file.content || typeof file.content !== "string") {
+      if (file.content === undefined || file.content === null || typeof file.content !== "string") {
         return NextResponse.json(
-          { error: `File ${file.path} must have content.` },
+          { error: `File ${file.path} content must be a valid string.` },
           { status: 400 }
         );
       }
@@ -105,7 +116,7 @@ export async function POST(req: NextRequest) {
       status: "pending",
       message: `Review started for ${files.length} file(s). This usually takes 20-30 seconds.`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Demo start error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

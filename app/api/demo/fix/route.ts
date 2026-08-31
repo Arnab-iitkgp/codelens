@@ -4,6 +4,21 @@ import { inngest } from "@/inngest/client";
 
 const RATE_LIMIT_HOURS = 24;
 
+interface DemoReviewFinding {
+  id?: string | number;
+  path?: string;
+  startLine?: number;
+  endLine?: number;
+  line?: number;
+  severity?: string;
+  claim?: string;
+  reasoning?: string;
+}
+
+interface StructuredReview {
+  inlineFindings?: DemoReviewFinding[];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -57,12 +72,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Extract structured findings
-    const structured = (demoReview.structured as any) || {};
-    const findings: any[] = structured.inlineFindings || [];
+    const structured = (demoReview.structured as StructuredReview | null) || {};
+    const findings: DemoReviewFinding[] = structured.inlineFindings || [];
 
     // Find the matching finding or build fallback text
-    const finding = findings.find((f: any) => String(f.id) === String(findingId)) || findings[0];
+    const finding = findings.find((f) => String(f.id) === String(findingId)) || findings[0];
 
     const filePath = finding?.path || "api.ts";
     const startLine = finding?.startLine || finding?.line || 1;
@@ -95,7 +109,7 @@ export async function POST(req: NextRequest) {
       findingId,
       message: "Auto-Fix agent booted. Generating patch...",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Demo fix API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
