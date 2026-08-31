@@ -87,7 +87,8 @@ export async function POST (req:NextRequest){
                             filePath: comment.path,
                             findingText,
                             targetStartLine,
-                            targetEndLine
+                            targetEndLine,
+                            replyToCommentId: comment.in_reply_to_id || comment.id
                         }
                     });
                         

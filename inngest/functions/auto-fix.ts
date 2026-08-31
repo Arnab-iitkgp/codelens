@@ -9,7 +9,7 @@ export const generateAutoFix = inngest.createFunction(
     retries: 2,
   },
   async ({ event, step }) => {
-    const { owner, repo, prNumber, filePath, findingText, targetStartLine, targetEndLine } = event.data;
+    const { owner, repo, prNumber, filePath, findingText, targetStartLine, targetEndLine, replyToCommentId } = event.data;
     
     await step.run("run-autofix-agent", async () => {
         const result = await runAutoFixAndComment(
@@ -19,7 +19,9 @@ export const generateAutoFix = inngest.createFunction(
             filePath, 
             findingText, 
             targetStartLine, 
-            targetEndLine
+            targetEndLine,
+            "agent",
+            replyToCommentId
         );
 
         if (!result.success) {

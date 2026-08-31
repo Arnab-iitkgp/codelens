@@ -74,7 +74,8 @@ export async function runAutoFixAndComment(
   finding: string,
   startLine: number,
   endLine: number,
-  chainRole: Role = "agent"
+  chainRole: Role = "agent",
+  replyToCommentId?: number
 ) {
   try {
     console.log(`[AutoFix] Triggered for ${owner}/${repo} PR #${prNumber} on ${filePath} (L${startLine}-${endLine}) using role "${chainRole}"`);
@@ -164,16 +165,26 @@ export async function runAutoFixAndComment(
     const commentBody = `🤖 **CodeLens Agent (Auto-Fix)**\n\nI analyzed the blast radius and autonomously generated this fix. Click **Commit suggestion** to merge it safely.\n\n\`\`\`suggestion\n${finalPatch}\n\`\`\`\n\n<details>\n<summary>Agent Reasoning Log</summary>\n\n${agentResult.plan}\n</details>`;
 
     try {
-      await octokit.rest.pulls.createReviewComment({
-        owner,
-        repo,
-        pull_number: prNumber,
-        body: commentBody,
-        commit_id: headCommitSha,
-        path: filePath,
-        line: finalEndLine,
-        start_line: finalStartLine !== finalEndLine ? finalStartLine : undefined
-      });
+      if (replyToCommentId) {
+        await octokit.rest.pulls.createReplyForReviewComment({
+          owner,
+          repo,
+          pull_number: prNumber,
+          comment_id: replyToCommentId,
+          body: commentBody,
+        });
+      } else {
+        await octokit.rest.pulls.createReviewComment({
+          owner,
+          repo,
+          pull_number: prNumber,
+          body: commentBody,
+          commit_id: headCommitSha,
+          path: filePath,
+          line: finalEndLine,
+          start_line: finalStartLine !== finalEndLine ? finalStartLine : undefined
+        });
+      }
     } catch (reviewErr: any) {
       if (reviewErr.status === 422) {
         console.warn("[Auto-Fix] ⚠️ GitHub rejected inline comment (422) because the line is outside the PR diff. Falling back to general PR comment.");
