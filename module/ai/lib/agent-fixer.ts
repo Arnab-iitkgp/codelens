@@ -1,6 +1,6 @@
 import { generateText, tool, type ModelMessage } from 'ai';
 import { z } from 'zod';
-import { getAgentChain, languageModelFor } from './models';
+import { getChain, languageModelFor, type Role } from './models';
 import { Octokit } from 'octokit';
 import { retrieveContext } from './rag';
 import prisma from '@/lib/db';
@@ -109,7 +109,8 @@ export async function runAgenticFixer(
   bugFinding: string, // the JSON string of the finding
   initialFilePath: string,
   startLine: number,
-  endLine: number
+  endLine: number,
+  chainRole: Role = "agent"
 ) {
   const octokit = new Octokit({ auth: githubToken });
 
@@ -272,7 +273,7 @@ IMPORTANT: Do NOT spend more than 2 steps on semantic_search. The graph and read
   // provider is worthless, and swapping models mid-conversation mixes two
   // different tool-calling behaviours. The first layer that gets through keeps
   // the run. AI_AGENT_CHAIN controls the order.
-  const chain = getAgentChain();
+  const chain = getChain(chainRole);
   const chainErrors: string[] = [];
 
   for (const layer of chain) {
