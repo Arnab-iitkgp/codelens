@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { Caveat } from "next/font/google";
 import { ModeToggle } from "@/components/mode-toggle";
+import { InViewVideo } from "@/components/in-view-video";
 
 const caveat = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
@@ -501,6 +502,26 @@ export default async function Home() {
             </div>
 
           </div>
+        </div>
+      </section>
+
+      {/* Interactive Product Film Section */}
+      <section className="relative w-full py-20 md:py-24 px-4 md:px-8 bg-[#09090b] dark:bg-[#fafafa] border-t border-zinc-200 dark:border-black/[0.05] overflow-hidden flex flex-col items-center transition-colors duration-300">
+        {/* Subtle Background Pattern (inverted) */}
+        <div 
+          className="absolute inset-0 opacity-[0.25] dark:hidden pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, #27272a 1px, transparent 1px)", backgroundSize: "32px 32px" }}
+        />
+        <div 
+          className="absolute inset-0 opacity-[0.35] hidden dark:block pointer-events-none"
+          style={{ backgroundImage: "radial-gradient(circle, #d4d4d8 1px, transparent 1px)", backgroundSize: "32px 32px" }}
+        />
+        
+        {/* Ambient Lighting Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-4xl h-[320px] bg-gradient-to-tr from-violet-600/15 via-purple-500/10 to-blue-500/15 dark:from-violet-500/10 dark:via-purple-400/5 dark:to-blue-400/10 rounded-full blur-[100px] pointer-events-none -z-0" />
+
+        <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center">
+          <InViewVideo />
         </div>
       </section>
 

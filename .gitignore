@@ -46,3 +46,18 @@ next-env.d.ts
 *key.json
 # eval run outputs — one directory per run, potentially large
 /eval/results/
+
+# scratch and local test scripts
+/scratch/
+create_repo.ts
+get_user.ts
+test_api.ts
+test_json.ts
+trigger_index.*
+
+# video render scratch
+/video/frames*/
+/video/test-frames/
+/video/original/
+video/*.wav
+video/*.mp4
