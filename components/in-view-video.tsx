@@ -7,30 +7,43 @@ export function InViewVideo() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const progressFillRef = useRef<HTMLDivElement | null>(null);
+  const progressHeadRef = useRef<HTMLDivElement | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const animFrameRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
 
-  // Smooth 60fps progress update via requestAnimationFrame
+  // Directly update DOM styles for 60fps scrubber without triggering ANY React re-renders
+  const updateProgressDOM = useCallback((ratio: number) => {
+    const clamped = Math.max(0, Math.min(1, ratio));
+    const pct = clamped * 100;
+    if (progressFillRef.current) {
+      progressFillRef.current.style.width = `${pct}%`;
+    }
+    if (progressHeadRef.current) {
+      progressHeadRef.current.style.left = `${pct}%`;
+    }
+  }, []);
+
+  // Smooth 60fps tracking ONLY when playing — automatically halts when paused/offscreen
   useEffect(() => {
+    if (!isPlaying) return;
+
+    let animId: number;
     const loop = () => {
       const video = videoRef.current;
-      if (video && video.duration && !isDragging) {
-        setProgress((video.currentTime / video.duration) * 100);
+      if (video && video.duration && !isDraggingRef.current) {
+        updateProgressDOM(video.currentTime / video.duration);
       }
-      animFrameRef.current = requestAnimationFrame(loop);
+      animId = requestAnimationFrame(loop);
     };
 
-    animFrameRef.current = requestAnimationFrame(loop);
-
+    animId = requestAnimationFrame(loop);
     return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
+      cancelAnimationFrame(animId);
     };
-  }, [isDragging]);
+  }, [isPlaying, updateProgressDOM]);
 
   // Autoplay on viewport enter, pause on leave
   useEffect(() => {
@@ -91,24 +104,24 @@ export function InViewVideo() {
     const rect = bar.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     video.currentTime = ratio * video.duration;
-    setProgress(ratio * 100);
-  }, []);
+    updateProgressDOM(ratio);
+  }, [updateProgressDOM]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    setIsDragging(true);
+    isDraggingRef.current = true;
     seekFromClientX(e.clientX);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
+    if (!isDraggingRef.current) return;
     seekFromClientX(e.clientX);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isDragging) {
+    if (isDraggingRef.current) {
       seekFromClientX(e.clientX);
-      setIsDragging(false);
+      isDraggingRef.current = false;
     }
   };
 
@@ -123,10 +136,10 @@ export function InViewVideo() {
   return (
     <div
       ref={containerRef}
-      className="relative z-10 w-full max-w-5xl mx-auto rounded-2xl border border-white/[0.1] bg-[#09090b] shadow-[0_30px_90px_rgba(0,0,0,0.7)] overflow-hidden group"
+      className="relative z-10 w-full max-w-5xl mx-auto rounded-2xl border border-white/[0.1] bg-[#09090b] shadow-[0_30px_90px_rgba(0,0,0,0.7)] overflow-hidden group transform-gpu"
     >
-      {/* Video Container (No fake website header, pure edge-to-edge frame) */}
-      <div className="relative aspect-video w-full bg-[#0a0a0c] overflow-hidden">
+      {/* Video Container (Hardware-accelerated edge-to-edge frame) */}
+      <div className="relative aspect-video w-full bg-[#0a0a0c] overflow-hidden transform-gpu will-change-transform">
         <video
           ref={videoRef}
           src="/video/codelens-launch-60s.mp4"
@@ -136,7 +149,7 @@ export function InViewVideo() {
           loop
           preload="metadata"
           onClick={togglePlay}
-          className="w-full h-full object-cover cursor-pointer"
+          className="w-full h-full object-cover cursor-pointer transform-gpu"
         />
 
         {/* Minimal Unmute / Sound Toggle in Top-Right */}
@@ -171,16 +184,18 @@ export function InViewVideo() {
           >
             {/* Background track */}
             <div className="w-full h-1 group-hover/scrub:h-1.5 bg-white/20 rounded-full transition-all overflow-hidden">
-              {/* Active fill */}
+              {/* Active fill (direct DOM updated) */}
               <div
+                ref={progressFillRef}
                 className="h-full bg-violet-500 rounded-full"
-                style={{ width: `${progress}%` }}
+                style={{ width: "0%" }}
               />
             </div>
-            {/* Draggable scrub head */}
+            {/* Draggable scrub head (direct DOM updated) */}
             <div
+              ref={progressHeadRef}
               className="absolute w-3 h-3 bg-white rounded-full shadow-md border border-violet-400 opacity-0 group-hover/scrub:opacity-100 transition-opacity pointer-events-none -ml-1.5"
-              style={{ left: `${progress}%` }}
+              style={{ left: "0%" }}
             />
           </div>
 
