@@ -10,8 +10,12 @@
   </a>
 </p>
 
+https://github.com/user-attachments/assets/ee0fa9ea-e9b1-4ffa-9e1b-658d3ff25bcf
+
+
+
 <p align="center">
-  <img src="./public/landing.png" width="100%" alt="CodeLens Landing" />
+  <img width="1881" height="885" alt="image" src="https://github.com/user-attachments/assets/9477e302-913e-4a2d-96bb-6b2c62d8a188" />
   <img src="./public/dashboard.png" width="49.5%" alt="CodeLens Dashboard" />
   <img src="./public/demo.png" width="49.5%" alt="CodeLens Demo" />
 </p>
