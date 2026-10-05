@@ -274,4 +274,12 @@
 - **Landing Page Inverted Contrast Styling (`app/page.tsx`)**: Placed the video showcase immediately before the final CTA section with black background in light mode and white background in dark mode, maintaining zero interference with the hero Mock PR window.
 - **Brand Favicon & Icon Generation**: Generated crisp multi-resolution ICO, 192px PNG, and 180px Apple touch icons from `public/codelens-logo.png` and configured explicit metadata links in `app/layout.tsx`.
 
+### 2026-10-05 — Landing Page Button Navigation & Hydration Fix
+- **Fixed Button Navigation & HTML Nesting (`app/page.tsx`, `app/demo/page.tsx`)**: Replaced `<Link><Button>...</Button></Link>` anti-pattern with standard Radix `<Button asChild><Link ...>...</Link></Button>`. Nesting `<button>` inside `<a>` created invalid HTML where the inner button intercepted clicks before and during client hydration, preventing native browser link navigation.
+- **Enabled Route Prefetching**: Added `prefetch={true}` to key landing page and demo navigation links (`/login`, `/demo`, `/dashboard/home`) to warm up Next.js route bundles on first paint, eliminating the on-demand compilation delay that made buttons appear unresponsive on initial landing.
+- **Fixed Missing Pointer-Events on Hero Grid (`app/page.tsx`)**: Added `pointer-events-none` to the absolute background grid divs in the hero section to prevent accidental pointer hit interception.
+- **Added Mount Guard to ModeToggle (`components/mode-toggle.tsx`)**: Added mounted state check to `ModeToggle` to prevent hydration mismatches between server-rendered and client-resolved themes.
+
+
+
 

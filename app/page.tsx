@@ -47,21 +47,21 @@ export default async function Home() {
             <div className="flex items-center gap-4">
               <ModeToggle />
               {isAuthenticated ? (
-                <Link href="/dashboard/home">
-                  <Button size="sm" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-5 h-9 text-sm font-medium shadow-none">
+                <Button asChild size="sm" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-5 h-9 text-sm font-medium shadow-none">
+                  <Link href="/dashboard/home" prefetch={true}>
                     Dashboard
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               ) : (
                 <>
-                  <Link href="/login" className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors hidden sm:block">
+                  <Link href="/login" prefetch={true} className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors hidden sm:block">
                     Log in
                   </Link>
-                  <Link href="/login">
-                    <Button size="sm" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-5 h-9 text-sm font-medium shadow-none">
+                  <Button asChild size="sm" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-5 h-9 text-sm font-medium shadow-none">
+                    <Link href="/login" prefetch={true}>
                       Get Started
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </>
               )}
             </div>
@@ -89,26 +89,26 @@ export default async function Home() {
             
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               {isAuthenticated ? (
-                <Link href="/dashboard/home">
-                  <Button size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                <Button asChild size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                  <Link href="/dashboard/home" prefetch={true}>
                     Go to Dashboard
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               ) : (
-                <Link href="/login">
-                  <Button size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                <Button asChild size="lg" className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md border border-zinc-900 dark:border-zinc-100 px-8 h-12 text-base font-medium shadow-sm group">
+                  <Link href="/login" prefetch={true}>
                     Connect with GitHub
                     <Github className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" />
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               )}
-              <Link href="/demo">
-                <Button size="lg" className="bg-white dark:bg-[#18181b] text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-[#27272a] rounded-md border border-zinc-200 dark:border-zinc-800 px-8 h-12 text-base font-medium shadow-sm group">
+              <Button asChild size="lg" className="bg-white dark:bg-[#18181b] text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-[#27272a] rounded-md border border-zinc-200 dark:border-zinc-800 px-8 h-12 text-base font-medium shadow-sm group">
+                <Link href="/demo" prefetch={true}>
                   Try Demo
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
             
           </div>
@@ -118,8 +118,8 @@ export default async function Home() {
       {/* Hero Visual Element */}
       <section className="relative w-full flex justify-center px-4 md:px-0">
         {/* Subtle grid background to match the "Code Graph" idea */}
-        <div className="absolute inset-0 bg-zinc-50 border-t border-zinc-200 z-0 dark:hidden" style={{ backgroundImage: "radial-gradient(#e5e7eb 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
-        <div className="absolute inset-0 bg-[#121214] border-t border-white/[0.05] z-0 hidden dark:block" style={{ backgroundImage: "radial-gradient(#27272a 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+        <div className="absolute inset-0 bg-zinc-50 border-t border-zinc-200 z-0 dark:hidden pointer-events-none" style={{ backgroundImage: "radial-gradient(#e5e7eb 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+        <div className="absolute inset-0 bg-[#121214] border-t border-white/[0.05] z-0 hidden dark:block pointer-events-none" style={{ backgroundImage: "radial-gradient(#27272a 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
         
         {/* Mock PR Window */}
         <div className="relative z-10 w-full max-w-3xl bg-[#fafafa] dark:bg-[#18181b] border border-zinc-200 dark:border-white/[0.05] rounded-xl shadow-2xl overflow-hidden mt-8 md:mt-12 -mb-12 md:-mb-16 translate-y-0 hover:-translate-y-2 transition-transform duration-700 ease-out flex flex-col">
@@ -250,12 +250,12 @@ export default async function Home() {
               It's about trusting your architecture.
             </p>
             <div className="mt-8">
-              <a href="https://codelens.mintlify.app" target="_blank" rel="noopener noreferrer">
-                <Button variant="secondary" className="bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 hover:bg-white dark:hover:bg-zinc-800 rounded-[8px] px-3.5 py-1.5 h-auto shadow-[0_0_15px_rgba(255,255,255,0.15)] dark:shadow-[0_4px_15px_rgba(0,0,0,0.05)] font-medium text-[13px] flex items-center transition-all">
+              <Button asChild variant="secondary" className="bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 hover:bg-white dark:hover:bg-zinc-800 rounded-[8px] px-3.5 py-1.5 h-auto shadow-[0_0_15px_rgba(255,255,255,0.15)] dark:shadow-[0_4px_15px_rgba(0,0,0,0.05)] font-medium text-[13px] flex items-center transition-all">
+                <a href="https://codelens.mintlify.app" target="_blank" rel="noopener noreferrer">
                   <Github className="w-3.5 h-3.5 mr-1.5" />
                   View Documentation
-                </Button>
-              </a>
+                </a>
+              </Button>
             </div>
           </div>
 
@@ -533,11 +533,11 @@ export default async function Home() {
          <p className="text-[16px] text-zinc-500 dark:text-zinc-400 mt-4 mb-8 max-w-[500px]">
            Connect your GitHub and let's review your next PR.
          </p>
-         <Link href="/login">
-           <Button className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 h-[48px] px-8 rounded-lg text-[15px] font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] shadow-xl shadow-zinc-900/10">
+         <Button asChild className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 h-[48px] px-8 rounded-lg text-[15px] font-semibold flex items-center gap-2 transition-all hover:scale-[1.02] shadow-xl shadow-zinc-900/10">
+           <Link href="/login" prefetch={true}>
               Start for free <ArrowRight className="w-4 h-4" />
-           </Button>
-         </Link>
+           </Link>
+         </Button>
       </section>
 
       {/* Footer */}

@@ -387,11 +387,11 @@ export default function DemoPage() {
             <AlertCircle className="h-3.5 w-3.5 text-primary/70" />
             <span><strong className="text-foreground/80">5 demos</strong> limit per day</span>
           </div>
-          <Link href="/login" className="shrink-0">
-            <Button size="sm" variant="default" className="h-8">
+          <Button asChild size="sm" variant="default" className="h-8 shrink-0">
+            <Link href="/login" prefetch={true}>
               Sign In
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -1184,22 +1184,22 @@ export default function DemoPage() {
               </span>
               <div className="flex items-center gap-3">
                 {demoPrUrl && (
-                  <Link href={demoPrUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="h-8">
+                  <Button asChild variant="outline" size="sm" className="h-8">
+                    <a href={demoPrUrl} target="_blank" rel="noopener noreferrer">
                       <Github className="mr-2 h-4 w-4" />
                       View Live PR
-                    </Button>
-                  </Link>
+                    </a>
+                  </Button>
                 )}
                 <Button variant="outline" size="sm" className="h-8" onClick={handleCopyReview} disabled={!reviewResult}>
                   {isCopied ? <Check className="mr-2 h-4 w-4 text-emerald-500" /> : <Copy className="mr-2 h-4 w-4" />}
                   {isCopied ? "Copied" : "Copy Review"}
                 </Button>
-                <Link href="/login">
-                  <Button size="sm" className="h-8 shadow-sm">
+                <Button asChild size="sm" className="h-8 shadow-sm">
+                  <Link href="/login" prefetch={true}>
                     Connect GitHub to Automate
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           )}
